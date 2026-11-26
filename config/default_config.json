@@ -391,7 +391,76 @@
   "hive": {
     "profile_file": "data/hive_profile.json",
     "auto_scan": true,
-    "color_override": ""
+    "color_override": "",
+    "bees": []
+  },
+  "bee_picks": {
+    "priority": [
+      "Digital",
+      "Vicious",
+      "Tabby",
+      "Precise",
+      "Spicy",
+      "Buoyant",
+      "Fuzzy",
+      "Tadpole",
+      "Vector",
+      "Photon",
+      "Windy",
+      "Festive",
+      "Ninja",
+      "Diamond",
+      "Lion"
+    ],
+    "avoid": [],
+    "prefer_gifted": true,
+    "prefer_hive_color": true,
+    "reroll_if_no_priority": false,
+    "max_reroll_cogs": 0
+  },
+  "quests": {
+    "priority": [
+      "collect_color_pollen",
+      "collect_field_pollen",
+      "defeat_mobs",
+      "convert_pollen"
+    ],
+    "prefer_harder_for_cogs": true,
+    "free_reroll_if_both": [
+      "convert_pollen"
+    ],
+    "chase_fast_bonus": true
+  },
+  "upgrades": {
+    "priority": [],
+    "blacklist": [],
+    "auto_buy": true,
+    "lock_unaffordable_priority": true,
+    "min_cog_reserve": 0,
+    "max_rerolls_per_round": 0,
+    "rarity_bias": {
+      "common": 1.0,
+      "rare": 1.0,
+      "epic": 1.1,
+      "legendary": 1.25
+    }
+  },
+  "drives": {
+    "enabled": true,
+    "only_with_digital_bee": true,
+    "choice": "auto",
+    "fallback_order": [
+      "glitched",
+      "red",
+      "blue",
+      "white"
+    ],
+    "use_on": "every_round",
+    "start_round": 1,
+    "max_per_run": 0,
+    "min_cog_reserve": 0,
+    "use_right_after_buying": true,
+    "hotbar_slot": 0
   },
   "timeouts_s": {
     "STARTING_ROBO_BEAR": 20.0,

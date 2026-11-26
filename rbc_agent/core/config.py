@@ -378,16 +378,171 @@ class StrategyConfig:
 
 
 @dataclass(frozen=True)
+class BeeEntry:
+    """One kind of bee in your hive (entered on the Hive tab)."""
+
+    bee: str
+    count: int = 1
+    gifted: int = 0          # how many of `count` are gifted
+    level: int = 1           # typical level of these bees
+
+    def validate(self) -> list[str]:
+        p = []
+        if not self.bee.strip():
+            p.append("bee name must not be empty")
+        if self.count < 1 or self.count > 50:
+            p.append(f"{self.bee}: count must be 1..50")
+        if not 0 <= self.gifted <= self.count:
+            p.append(f"{self.bee}: gifted must be between 0 and count")
+        if not 1 <= self.level <= 25:
+            p.append(f"{self.bee}: level must be 1..25")
+        return p
+
+
+@dataclass(frozen=True)
 class HiveConfig:
     profile_file: str = "data/hive_profile.json"
     auto_scan: bool = True
     # "" = detect automatically; otherwise force red/blue/white/mixed.
     color_override: str = ""
+    # Your hive, entered by hand on the Hive tab. Used for colour detection,
+    # bee-pick scoring and the Digital Bee drive rule.
+    bees: list[BeeEntry] = field(default_factory=list)
 
     def validate(self) -> list[str]:
+        p = []
         if self.color_override not in {"", "red", "blue", "white", "mixed"}:
-            return [f"color_override '{self.color_override}' must be '', red, blue, white or mixed"]
-        return []
+            p.append(f"color_override '{self.color_override}' must be '', red, blue, white or mixed")
+        names = [b.bee.lower() for b in self.bees]
+        if len(names) != len(set(names)):
+            p.append("bees: the same bee is listed twice (use count instead)")
+        if sum(b.count for b in self.bees) > 50:
+            p.append("bees: a hive holds at most 50 bees")
+        return p
+
+    def has_bee(self, name: str) -> bool:
+        n = name.strip().lower().removesuffix(" bee")
+        return any(b.bee.strip().lower().removesuffix(" bee") == n for b in self.bees)
+
+
+@dataclass(frozen=True)
+class BeePickConfig:
+    """How to choose bees in the RBC bee-pick screen."""
+
+    # Bees to take first, best first (names from data/bees.json).
+    priority: list[str] = field(default_factory=lambda: [
+        "Digital", "Vicious", "Tabby", "Precise", "Spicy", "Buoyant", "Fuzzy",
+        "Tadpole", "Vector", "Photon", "Windy", "Festive", "Ninja", "Diamond", "Lion",
+    ])
+    # Bees never to pick unless nothing else is offered.
+    avoid: list[str] = field(default_factory=list)
+    prefer_gifted: bool = True
+    # Give extra score to bees matching your hive colour.
+    prefer_hive_color: bool = True
+    # Use a (paid) reroll if none of the offered bees is on the priority list.
+    reroll_if_no_priority: bool = False
+    max_reroll_cogs: int = 0
+
+    def validate(self) -> list[str]:
+        p = []
+        overlap = {b.lower() for b in self.priority} & {b.lower() for b in self.avoid}
+        if overlap:
+            p.append(f"bees on both priority and avoid lists: {', '.join(sorted(overlap))}")
+        if self.max_reroll_cogs < 0:
+            p.append("max_reroll_cogs must be >= 0")
+        return p
+
+
+QUEST_TYPES = ("collect_field_pollen", "collect_color_pollen", "convert_pollen", "defeat_mobs")
+
+
+@dataclass(frozen=True)
+class QuestConfig:
+    """How to choose between the two quest cards each round."""
+
+    # Best first. Ids match objective_patterns in data/rbc_rules.json.
+    priority: list[str] = field(default_factory=lambda: [
+        "collect_color_pollen", "collect_field_pollen", "defeat_mobs", "convert_pollen"])
+    # Prefer the harder card (more Cogs) when both are the same type.
+    prefer_harder_for_cogs: bool = True
+    # Spend the one free reroll per run when both cards are of these types.
+    free_reroll_if_both: list[str] = field(default_factory=lambda: ["convert_pollen"])
+    # Try to finish under 120 s for bonus Cogs (more aggressive returns).
+    chase_fast_bonus: bool = True
+
+    def validate(self) -> list[str]:
+        bad = [q for q in self.priority + self.free_reroll_if_both if q not in QUEST_TYPES]
+        return [f"unknown quest type(s): {', '.join(bad)} (use {', '.join(QUEST_TYPES)})"] if bad else []
+
+
+@dataclass(frozen=True)
+class UpgradeConfig:
+    """Shop behaviour between rounds."""
+
+    # Upgrade ids (from data/rbc_rules.json) to always buy first, best first.
+    priority: list[str] = field(default_factory=list)
+    # Upgrade ids never to buy.
+    blacklist: list[str] = field(default_factory=list)
+    auto_buy: bool = True
+    lock_unaffordable_priority: bool = True
+    # Always keep at least this many Cogs after a purchase.
+    min_cog_reserve: int = 0
+    max_rerolls_per_round: int = 0
+    # Extra multiplier per rarity on the upgrade score.
+    rarity_bias: dict[str, float] = field(default_factory=lambda: {
+        "common": 1.0, "rare": 1.0, "epic": 1.1, "legendary": 1.25})
+
+    def validate(self) -> list[str]:
+        p = []
+        if self.min_cog_reserve < 0 or self.max_rerolls_per_round < 0:
+            p.append("min_cog_reserve and max_rerolls_per_round must be >= 0")
+        if set(self.priority) & set(self.blacklist):
+            p.append("an upgrade can't be on both priority and blacklist")
+        if any(v < 0 for v in self.rarity_bias.values()):
+            p.append("rarity_bias values must be >= 0")
+        return p
+
+
+DRIVE_TYPES = ("red", "blue", "white", "glitched")
+
+
+@dataclass(frozen=True)
+class DriveConfig:
+    """Auto-buy and use Drives. Drives only do anything with Digital Bee,
+    so by default nothing is bought unless Digital Bee is in your hive."""
+
+    enabled: bool = True
+    only_with_digital_bee: bool = True
+    # "auto" = pick the drive matching your hive colour (glitched for mixed),
+    # otherwise one of red/blue/white/glitched.
+    choice: str = "auto"
+    # Fallback order if the chosen drive isn't offered / affordable.
+    fallback_order: list[str] = field(default_factory=lambda: ["glitched", "red", "blue", "white"])
+    # every_round | fixed_rounds_only (5/10/15/20/25) | pollen_quests_only
+    use_on: str = "every_round"
+    start_round: int = 1
+    max_per_run: int = 0                # 0 = no limit
+    min_cog_reserve: int = 0
+    use_right_after_buying: bool = True
+    # Hotbar slot (1-7) the drive sits in; 0 = use it from the inventory.
+    hotbar_slot: int = 0
+
+    def validate(self) -> list[str]:
+        p = []
+        if self.choice not in ("auto",) + DRIVE_TYPES:
+            p.append(f"choice '{self.choice}' must be auto, {', '.join(DRIVE_TYPES)}")
+        bad = [d for d in self.fallback_order if d not in DRIVE_TYPES]
+        if bad:
+            p.append(f"fallback_order: unknown drive(s) {', '.join(bad)}")
+        if self.use_on not in ("every_round", "fixed_rounds_only", "pollen_quests_only"):
+            p.append("use_on must be every_round, fixed_rounds_only or pollen_quests_only")
+        if not 1 <= self.start_round <= 25:
+            p.append("start_round must be 1..25")
+        if self.max_per_run < 0 or self.min_cog_reserve < 0:
+            p.append("max_per_run and min_cog_reserve must be >= 0")
+        if not 0 <= self.hotbar_slot <= 7:
+            p.append("hotbar_slot must be 0..7")
+        return p
 
 
 def _default_timeouts() -> dict[str, float]:
@@ -517,6 +672,10 @@ class AppConfig:
     fields: FieldConfig = field(default_factory=FieldConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     hive: HiveConfig = field(default_factory=HiveConfig)
+    bee_picks: BeePickConfig = field(default_factory=BeePickConfig)
+    quests: QuestConfig = field(default_factory=QuestConfig)
+    upgrades: UpgradeConfig = field(default_factory=UpgradeConfig)
+    drives: DriveConfig = field(default_factory=DriveConfig)
     timeouts_s: dict[str, float] = field(default_factory=_default_timeouts)
     recovery: RecoveryConfig = field(default_factory=RecoveryConfig)
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
@@ -652,6 +811,9 @@ def _validate_tree(obj: Any, path: str, problems: list[str]) -> None:
     elif isinstance(obj, dict):
         for k, v in obj.items():
             _validate_tree(v, f"{path}.{k}", problems)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            _validate_tree(v, f"{path}[{i}]", problems)
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

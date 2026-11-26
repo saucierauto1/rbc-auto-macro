@@ -12,6 +12,13 @@ architecture notes, implementation, how to run, how to test, and known limitatio
   (`wait_until`, `CancelToken`, `RateGate`, `FakeClock`), errors, state enums,
   game rules loader (`rbc_agent/game/rules.py`), and the Tk control panel
   (`rbc_agent/ui/app.py`; Start/Pause/Stop/Calibrate are disabled until later stages).
+- **Settings GUI + decision logic (0.2.0):** tabbed control panel (`ui/app.py`,
+  `ui/widgets.py`): Hive, Bee Picks, Quests & Fields, Upgrades, Drives, Farming,
+  Controls; saves only non-default values to `config/config.json`. New config
+  sections `hive.bees`, `bee_picks`, `quests`, `upgrades`, `drives`. Pure pickers in
+  `decision/picks.py` and `decision/drives.py` (drives only with Digital Bee in hive),
+  hive colour in `game/hive.py` (bee list in `data/bees.json`). START runs
+  `core/preflight.py`; flip `ENGINE_PARTS` there as stages land.
 - **Next: Stage 2:** Roblox window finder (Win32 via ctypes), DPI awareness, client
   rect, focus check, `mss` region capture, normalised-region → pixel mapping, debug
   screenshot dumps. Waiting on the user's screenshots (quest choice, bee choice,
