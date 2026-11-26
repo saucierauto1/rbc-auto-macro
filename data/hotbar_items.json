@@ -1,0 +1,30 @@
+{
+  "_source": "Common Bee Swarm Simulator consumables. 'suggest' is a sensible default for the RBC; durations are typical values, change them if your version differs. The wiki confirms consumables and field boosts work during RBC rounds; planters and Beesmas items do not.",
+  "items": {
+    "Glitter":         {"suggest": "in_field",      "every_s": 900, "what": "x1.25 pollen in the field for 15 min"},
+    "Field Dice":      {"suggest": "round_start",   "every_s": 30,  "what": "boosts a random field"},
+    "Smooth Dice":     {"suggest": "round_start",   "every_s": 30,  "what": "boosts a random field (better odds)"},
+    "Loaded Dice":     {"suggest": "round_start",   "every_s": 30,  "what": "boosts a random field (choose fields)"},
+    "Micro-Converter": {"suggest": "backpack_full", "every_s": 5,   "what": "converts your backpack instantly"},
+    "Whirligig":       {"suggest": "backpack_full", "every_s": 5,   "what": "teleports you to your hive"},
+    "Enzymes":         {"suggest": "in_field",      "every_s": 600, "what": "+pollen / conversion / ability rate for 10 min"},
+    "Oil":             {"suggest": "in_field",      "every_s": 600, "what": "+bee speed and pollen for 10 min"},
+    "Tropical Drink":  {"suggest": "in_field",      "every_s": 600, "what": "+bee speed / ability rate for 10 min"},
+    "Red Extract":     {"suggest": "in_field",      "every_s": 600, "what": "+red pollen and attack for 10 min"},
+    "Blue Extract":    {"suggest": "in_field",      "every_s": 600, "what": "+blue pollen and conversion for 10 min"},
+    "Jelly Beans":     {"suggest": "in_field",      "every_s": 30,  "what": "random short buff"},
+    "Purple Potion":   {"suggest": "round_start",   "every_s": 900, "what": "big buff for 15 min"},
+    "Super Smoothie":  {"suggest": "round_start",   "every_s": 1200, "what": "big buff for 20 min (wiki: use it for high scores)"},
+    "Stinger":         {"suggest": "mobs_nearby",   "every_s": 30,  "what": "+bee attack for 30 s"},
+    "Coconut":         {"suggest": "in_field",      "every_s": 10,  "what": "drops coconuts (RBC debuff lowers coconut pollen)"},
+    "Cloud Vial":      {"suggest": "in_field",      "every_s": 180, "what": "rain cloud over your field"},
+    "Neonberry":       {"suggest": "never",         "every_s": 60,  "what": "feeds a bee (not useful mid-round)"},
+    "Bitterberry":     {"suggest": "never",         "every_s": 60,  "what": "feeds a bee (not useful mid-round)"},
+    "Atomic Treat":    {"suggest": "never",         "every_s": 60,  "what": "feeds a bee"},
+    "Honeysuckle":     {"suggest": "never",         "every_s": 60,  "what": "hive item"},
+    "Red Drive":       {"suggest": "round_start",   "every_s": 300, "what": "x1.25 red pollen/capacity for one round"},
+    "Blue Drive":      {"suggest": "round_start",   "every_s": 300, "what": "x1.25 blue pollen/capacity for one round"},
+    "White Drive":     {"suggest": "round_start",   "every_s": 300, "what": "x1.25 white pollen/capacity for one round"},
+    "Glitched Drive":  {"suggest": "round_start",   "every_s": 300, "what": "x1.25 all pollen/capacity for one round"}
+  }
+}

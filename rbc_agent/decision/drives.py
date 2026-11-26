@@ -1,7 +1,8 @@
 """When to buy and use a Drive. Pure logic, no screen or input.
 
-Drives boost pollen/capacity/attack for one round, but only through
-Digital Bee. With ``only_with_digital_bee`` on (the default), the agent never
+Drives boost pollen/capacity/attack for one round; with Digital Bee active
+they also corrupt the field and permanently enhance Digital Bee (wiki: Drive
+Expansion). With ``only_with_digital_bee`` on (the default), the agent never
 spends Cogs on a drive unless Digital Bee is in your hive.
 """
 

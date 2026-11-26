@@ -190,7 +190,7 @@ class PollenConfig:
     must_return_above: float = 0.98
     # With less than this many seconds left, returning is usually wasted
     # time unless conversion itself counts toward the objective.
-    # (RBC rounds are 300 s; finishing under 120 s pays bonus Cogs.)
+    # (RBC rounds are 300 s; finishing under 3:45 pays the Round Speed Bonus.)
     low_time_s: float = 20.0
     travel_safety_margin_s: float = 3.0
     convert_timeout_s: float = 90.0
@@ -442,6 +442,12 @@ class BeePickConfig:
     # Use a (paid) reroll if none of the offered bees is on the priority list.
     reroll_if_no_priority: bool = False
     max_reroll_cogs: int = 0
+    # Scoring weights (score = priority + rarity + colour + gifted).
+    priority_base: float = 100.0
+    priority_step: float = 3.0          # each place down the list loses this much
+    rarity_weight: float = 2.0          # x rarity rank (common 0 .. mythic/event 4)
+    color_match_bonus: float = 6.0
+    gifted_bonus: float = 8.0
 
     def validate(self) -> list[str]:
         p = []
@@ -467,7 +473,7 @@ class QuestConfig:
     prefer_harder_for_cogs: bool = True
     # Spend the one free reroll per run when both cards are of these types.
     free_reroll_if_both: list[str] = field(default_factory=lambda: ["convert_pollen"])
-    # Try to finish under 120 s for bonus Cogs (more aggressive returns).
+    # Try to finish under 3:45 for the Round Speed Bonus (more aggressive returns).
     chase_fast_bonus: bool = True
 
     def validate(self) -> list[str]:
@@ -491,6 +497,12 @@ class UpgradeConfig:
     # Extra multiplier per rarity on the upgrade score.
     rarity_bias: dict[str, float] = field(default_factory=lambda: {
         "common": 1.0, "rare": 1.0, "epic": 1.1, "legendary": 1.25})
+    # Scoring weights.
+    base_score: float = 10.0
+    hive_color_mult: float = 1.3        # upgrade matches your hive colour
+    off_color_mult: float = 0.5         # red upgrade in a blue hive or vice versa
+    priority_bonus: float = 1000.0
+    priority_step: float = 10.0
 
     def validate(self) -> list[str]:
         p = []
@@ -542,6 +554,125 @@ class DriveConfig:
             p.append("max_per_run and min_cog_reserve must be >= 0")
         if not 0 <= self.hotbar_slot <= 7:
             p.append("hotbar_slot must be 0..7")
+        return p
+
+
+HOTBAR_WHEN = ("never", "always", "round_start", "in_field", "at_hive", "backpack_full",
+               "mobs_nearby", "fixed_rounds", "low_time")
+
+
+@dataclass(frozen=True)
+class HotbarSlot:
+    """One hotbar slot (keys 1-7) and when to use what's in it."""
+
+    slot: int
+    item: str = ""                    # name from data/hotbar_items.json (or your own)
+    use_when: str = "never"
+    every_s: float = 60.0             # min seconds between uses (item cooldown / duration)
+    max_per_round: int = 0            # 0 = no limit
+    from_round: int = 1
+    low_time_s: float = 60.0          # for use_when=low_time: use when less than this is left
+    only_during_rounds: bool = True   # never use it between rounds / outside RBC
+
+    def validate(self) -> list[str]:
+        p = []
+        if not 1 <= self.slot <= 7:
+            p.append(f"slot {self.slot}: must be 1..7")
+        if self.use_when not in HOTBAR_WHEN:
+            p.append(f"slot {self.slot}: use_when '{self.use_when}' must be one of {', '.join(HOTBAR_WHEN)}")
+        if self.use_when != "never" and not self.item.strip():
+            p.append(f"slot {self.slot}: pick an item (or set use_when to never)")
+        if self.every_s < 0.5:
+            p.append(f"slot {self.slot}: every_s must be >= 0.5")
+        if self.max_per_round < 0 or not 1 <= self.from_round <= 25 or self.low_time_s < 0:
+            p.append(f"slot {self.slot}: max_per_round >= 0, from_round 1..25, low_time_s >= 0")
+        return p
+
+
+@dataclass(frozen=True)
+class HotbarConfig:
+    enabled: bool = True
+    slots: list[HotbarSlot] = field(default_factory=list)
+    # Never press two hotbar keys closer together than this.
+    min_gap_s: float = 0.4
+    # use_when=mobs_nearby: how many visible mobs count as "nearby".
+    mobs_nearby_count: int = 2
+    # use_when=backpack_full: fraction of capacity.
+    backpack_full_at: float = 0.95
+
+    def validate(self) -> list[str]:
+        p = []
+        slots = [s.slot for s in self.slots]
+        if len(slots) != len(set(slots)):
+            p.append("the same hotbar slot is listed twice")
+        if self.min_gap_s < 0 or self.mobs_nearby_count < 1:
+            p.append("min_gap_s must be >= 0 and mobs_nearby_count >= 1")
+        if not 0.3 <= self.backpack_full_at <= 1.0:
+            p.append("backpack_full_at must be in [0.3, 1.0]")
+        return p
+
+    def slot(self, n: int) -> HotbarSlot | None:
+        return next((s for s in self.slots if s.slot == n), None)
+
+
+@dataclass(frozen=True)
+class CombatConfig:
+    """Dodging and fighting RBC mobs (tactics from the BSS wiki)."""
+
+    dodge_enabled: bool = True
+    # Mechsquitos aim at where you ARE: keep moving so their shots miss.
+    # circle | zigzag | none
+    mechsquito_dodge: str = "circle"
+    dodge_radius: float = 1.0               # size of the dodge pattern (1 = normal)
+    # Start dodging when this many Mechsquito Toxin stacks are on you (0 = always when one is seen).
+    dodge_at_toxin_stacks: int = 0
+    # Cogturrets fire straight ahead after rising: step sideways out of their line.
+    sidestep_cogturrets: bool = True
+    sidestep_s: float = 0.6
+    # Cogmowers drive in straight lines and don't aim: step out of their path.
+    avoid_cogmowers: bool = True
+    # Move close to mobs so your bees lock on and kill them faster.
+    stand_near_mobs: bool = True
+    prioritize_cogturrets: bool = True
+    jump_while_dodging: bool = False
+    # Golden Cogmower: 14-20 Cogs, 3 per run in Clover/Pineapple/Pumpkin/Mountain Top.
+    hunt_golden_cogmower: bool = True
+    golden_max_detour_s: float = 25.0
+    # Leave a field if this many Toxin stacks pile up (0 = never).
+    leave_field_at_toxin_stacks: int = 8
+    # Geometry, in field units (~ one player width = 1).
+    danger_line_width: float = 1.5      # half-width of a turret shot / mower path
+    cogmower_alert_range: float = 4.0
+    approach_min_dist: float = 2.0      # closer than this: already close enough
+    approach_range: float = 6.0         # farther than this: not worth walking to
+
+    def validate(self) -> list[str]:
+        p = []
+        if self.mechsquito_dodge not in ("circle", "zigzag", "none"):
+            p.append("mechsquito_dodge must be circle, zigzag or none")
+        if not 0.2 <= self.dodge_radius <= 3.0:
+            p.append("dodge_radius must be in [0.2, 3.0]")
+        if not 0 <= self.dodge_at_toxin_stacks <= 10 or not 0 <= self.leave_field_at_toxin_stacks <= 10:
+            p.append("toxin stack values must be 0..10")
+        if self.sidestep_s <= 0 or self.golden_max_detour_s < 0:
+            p.append("sidestep_s must be > 0 and golden_max_detour_s >= 0")
+        return p
+
+
+@dataclass(frozen=True)
+class CaptureConfig:
+    # A grab is reused for this long, so detectors in the same tick share it.
+    cache_max_age_ms: int = 50
+    # Countdown before the "Screenshot" button grabs, so you can switch to Roblox.
+    screenshot_delay_s: int = 3
+    save_region_crops: bool = True
+
+    def validate(self) -> list[str]:
+        p = []
+        if not 0 <= self.cache_max_age_ms <= 2000:
+            p.append("cache_max_age_ms must be 0..2000")
+        if not 0 <= self.screenshot_delay_s <= 30:
+            p.append("screenshot_delay_s must be 0..30")
         return p
 
 
@@ -676,6 +807,9 @@ class AppConfig:
     quests: QuestConfig = field(default_factory=QuestConfig)
     upgrades: UpgradeConfig = field(default_factory=UpgradeConfig)
     drives: DriveConfig = field(default_factory=DriveConfig)
+    hotbar: HotbarConfig = field(default_factory=HotbarConfig)
+    combat: CombatConfig = field(default_factory=CombatConfig)
+    capture: CaptureConfig = field(default_factory=CaptureConfig)
     timeouts_s: dict[str, float] = field(default_factory=_default_timeouts)
     recovery: RecoveryConfig = field(default_factory=RecoveryConfig)
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
@@ -696,6 +830,11 @@ class AppConfig:
                 p.append(f"timeouts_s: state '{name}' cannot have a timeout")
             elif val <= 0:
                 p.append(f"timeouts_s.{name} must be > 0")
+        # Cross-section: the drive's hotbar slot can't hold another item.
+        ds = self.drives.hotbar_slot
+        other = self.hotbar.slot(ds) if ds else None
+        if other and other.item and "drive" not in other.item.lower():
+            p.append(f"drives.hotbar_slot={ds} but hotbar slot {ds} holds '{other.item}'")
         return p
 
     def timeout_for(self, state: AgentState) -> float | None:

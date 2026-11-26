@@ -37,13 +37,13 @@ def score_bee(bee: OfferedBee, cfg: BeePickConfig, hive: HiveProfile,
     info = catalog.get(name)
     s = 0.0
     if name in prio:
-        s += 100.0 - 3.0 * prio.index(name)        # list order matters most
+        s += cfg.priority_base - cfg.priority_step * prio.index(name)        # list order matters most
     if info:
-        s += 2.0 * RARITY_SCORE.get(info.rarity, 0)
+        s += cfg.rarity_weight * RARITY_SCORE.get(info.rarity, 0)
         if cfg.prefer_hive_color and hive.color in ("red", "blue", "white") and info.color == hive.color:
-            s += 6.0
+            s += cfg.color_match_bonus
     if cfg.prefer_gifted and bee.gifted:
-        s += 8.0
+        s += cfg.gifted_bonus
     if name in avoid:
         s -= 1000.0
     return s
@@ -113,17 +113,17 @@ class ShopPlan:
 
 
 def score_upgrade(u: UpgradeDef, cfg: UpgradeConfig, weights: StrategyWeights, hive: HiveProfile) -> float:
-    s = 10.0 * cfg.rarity_bias.get(u.rarity, 1.0)
+    s = cfg.base_score * cfg.rarity_bias.get(u.rarity, 1.0)
     for t in u.tags:
         s *= weights.tag_bias.get(t, 1.0)
     if u.color in ("red", "blue", "white"):
         s *= weights.color_bias.get(u.color, 1.0)
         if u.color == hive.color:
-            s *= 1.3
+            s *= cfg.hive_color_mult
         elif hive.color in ("red", "blue") and u.color in ("red", "blue"):
-            s *= 0.5   # off-colour upgrade for a mono hive
+            s *= cfg.off_color_mult   # off-colour upgrade for a mono hive
     if u.id in cfg.priority:
-        s += 1000.0 - 10.0 * cfg.priority.index(u.id)
+        s += cfg.priority_bonus - cfg.priority_step * cfg.priority.index(u.id)
     return s
 
 

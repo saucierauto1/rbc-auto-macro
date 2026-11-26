@@ -14,16 +14,17 @@ import json
 import logging
 import os
 import queue
+import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Callable
 
 from .. import __version__
-from ..core.config import (DRIVE_TYPES, QUEST_TYPES, AppConfig, BeeEntry, ConfigManager,
+from ..core.config import (DRIVE_TYPES, HOTBAR_WHEN, QUEST_TYPES, AppConfig, BeeEntry, ConfigManager,
                            DriveConfig, HiveConfig, parse_config, to_dict)
 from ..core.errors import ConfigError
 from ..core.logger import Category, LogEvent, setup_logging
-from ..core.paths import LOGS_DIR, USER_CONFIG_FILE
+from ..core.paths import DATA_DIR, LOGS_DIR, USER_CONFIG_FILE
 from ..core.preflight import can_start, run_preflight
 from ..core.states import StrategyProfile
 from ..decision.drives import plan_drive, preferred_drives
@@ -174,6 +175,8 @@ class ControlPanel:
         self._tab_quests_fields()
         self._tab_upgrades()
         self._tab_drives()
+        self._tab_hotbar()
+        self._tab_combat()
         self._tab_farming()
         self._tab_controls()
         self.nb.bind("<<NotebookTabChanged>>", lambda e: self._update_drive_preview())
@@ -250,7 +253,8 @@ class ControlPanel:
                                    state="disabled")
         self.btn_reload = ttk.Button(bar, text="⟳ Reload config", command=self._reload_config)
         self.btn_calib = ttk.Button(bar, text="⌖ Calibrate (Stage 3)", state="disabled")
-        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_reload, self.btn_calib):
+        self.btn_shot = ttk.Button(bar, text="📸 Screenshot", command=self._screenshot)
+        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_reload, self.btn_calib):
             b.pack(side="left", padx=(0, 6))
         self.debug_var = tk.BooleanVar(value=self.cfg_mgr.config.debug.enabled)
         ttk.Checkbutton(bar, text="Debug mode", variable=self.debug_var,
@@ -467,7 +471,7 @@ class ControlPanel:
         sec2 = ttk.Frame(sec)
         sec2.pack(fill="x", pady=(10, 0))
         self._bvar(("quests", "prefer_harder_for_cogs"), "Prefer the harder quest (more Cogs)", sec2, 0)
-        self._bvar(("quests", "chase_fast_bonus"), "Go for the under-120 s bonus Cogs", sec2, 1)
+        self._bvar(("quests", "chase_fast_bonus"), "Go for the speed bonus Cogs (finish under 3:45)", sec2, 1)
         ttk.Label(sec2, text="Use the free reroll when BOTH quests are:", style="Muted.TLabel").grid(
             row=2, column=0, sticky="w", pady=(8, 2))
         self._reroll_vars: dict[str, tk.BooleanVar] = {}
@@ -549,8 +553,11 @@ class ControlPanel:
     # --------------------------------------------------------------- drives
     def _tab_drives(self) -> None:
         body = self._settings_tab("Drives", "Drives (Red / Blue / White / Glitched) give x1.25 pollen, "
-                                  "x1.25 field capacity and +1 bee attack for one round, through Digital Bee. "
-                                  "With the safety switch on, no Cogs are spent unless Digital Bee is in your hive.")
+                                  "x1.25 field capacity and +1 bee attack for one round. With Digital Bee "
+                                  "active they also corrupt your field and permanently upgrade Digital Bee. "
+                                  "Shop price: 50 Cogs + honey (Glitched: 100 Cogs + 5 of each other drive, "
+                                  "needs the Gold Cog Amulet). With the safety switch on, nothing is bought "
+                                  "unless Digital Bee is in your hive.")
         self.drive_banner = tk.Label(body, text="", bg=PANEL, fg=FG, font=("Segoe UI", 11, "bold"),
                                      anchor="w", padx=12, pady=10, justify="left")
         self.drive_banner.pack(fill="x", pady=(0, 12))
@@ -588,7 +595,8 @@ class ControlPanel:
             return
         cfg = self._drive_cfg_from_gui()
         hive = self._current_hive()
-        if cfg is None:
+        # Mid-reload the fields can be half-filled; skip until they're valid.
+        if cfg is None or cfg.validate() or not preferred_drives(cfg, hive):
             return
         if not cfg.enabled:
             text, color = "Drives are OFF.", MUTED
@@ -606,6 +614,182 @@ class ControlPanel:
                     f"{', used right away' if demo.use else ''}.")
             color = OK
         self.drive_banner.configure(text=text, fg=color)
+
+    # --------------------------------------------------------------- hotbar
+    def _tab_hotbar(self) -> None:
+        body = self._settings_tab("Hotbar", "Tell the agent what is in each hotbar slot (keys 1-7) and "
+                                  "when to use it. The wiki confirms consumables and field boosts work "
+                                  "during RBC rounds (planters and Beesmas items don't). Drives in the "
+                                  "hotbar follow the Digital Bee rule from the Drives tab.")
+        try:
+            self.item_db = json.loads((DATA_DIR / "hotbar_items.json").read_text(encoding="utf-8"))["items"]
+        except (OSError, ValueError, KeyError):
+            self.item_db = {}
+        sec = self._section(body, "General")
+        self._bvar(("hotbar", "enabled"), "Use hotbar items automatically", sec, 0)
+        self._num(("hotbar", "min_gap_s"), "Min gap between key presses (s)", sec, 1, 0, 5, 0.1, True)
+        self._num(("hotbar", "mobs_nearby_count"), "'Mobs nearby' means at least", sec, 2, 1, 20, hint="mobs on screen")
+        v = self._track(self.binder.var(("hotbar", "backpack_full_at"), tk.DoubleVar(), _f2))
+        labeled(sec, 3, "'Backpack full' means", lambda p: PercentScale(p, v, 0.5, 1.0))
+
+        sec = self._section(body, "Slots")
+        heads = ("Key", "Item", "Use when", "Every (s)", "Max/round", "From round", "Low time (s)", "Rounds only", "")
+        for c, h in enumerate(heads):
+            ttk.Label(sec, text=h, style="Muted.TLabel").grid(row=0, column=c, sticky="w", padx=3)
+        when_help = {"never": "never", "always": "on cooldown", "round_start": "round start",
+                     "in_field": "while farming", "at_hive": "at hive", "backpack_full": "backpack full",
+                     "mobs_nearby": "mobs nearby", "fixed_rounds": "rounds 5/10/15/20/25",
+                     "low_time": "time running out"}
+        self._when_from_label = {v: k for k, v in when_help.items()}
+        self._hb_rows: dict[int, dict[str, tk.Variable]] = {}
+        for n in range(1, 8):
+            r = {"item": tk.StringVar(), "use_when": tk.StringVar(value="never"),
+                 "every_s": tk.DoubleVar(value=60.0), "max_per_round": tk.IntVar(value=0),
+                 "from_round": tk.IntVar(value=1), "low_time_s": tk.DoubleVar(value=60.0),
+                 "only_during_rounds": tk.BooleanVar(value=True)}
+            for var in r.values():
+                self._track(var)
+            self._hb_rows[n] = r
+            row = n
+            tk.Label(sec, text=str(n), bg=PANEL, fg=ACCENT, width=3, font=("Segoe UI", 11, "bold")).grid(
+                row=row, column=0, padx=3, pady=3)
+            ttk.Combobox(sec, textvariable=r["item"], values=[""] + list(self.item_db), width=16).grid(
+                row=row, column=1, padx=3)
+            wl = tk.StringVar(value=when_help["never"])
+            r["_when_label"] = wl
+            cb = ttk.Combobox(sec, textvariable=wl, values=[when_help[w] for w in HOTBAR_WHEN],
+                              state="readonly", width=16)
+            cb.grid(row=row, column=2, padx=3)
+            wl.trace_add("write", lambda *_, r=r: r["use_when"].set(self._when_from_label.get(r["_when_label"].get(), "never")))
+            r["use_when"].trace_add("write", lambda *_, r=r, wh=when_help: r["_when_label"].set(wh.get(r["use_when"].get(), "never")))
+            ttk.Spinbox(sec, from_=0.5, to=7200, increment=5, textvariable=r["every_s"], width=7).grid(row=row, column=3, padx=3)
+            ttk.Spinbox(sec, from_=0, to=99, textvariable=r["max_per_round"], width=5).grid(row=row, column=4, padx=3)
+            ttk.Spinbox(sec, from_=1, to=25, textvariable=r["from_round"], width=5).grid(row=row, column=5, padx=3)
+            ttk.Spinbox(sec, from_=0, to=300, increment=5, textvariable=r["low_time_s"], width=6).grid(row=row, column=6, padx=3)
+            ttk.Checkbutton(sec, variable=r["only_during_rounds"]).grid(row=row, column=7)
+            ttk.Button(sec, text="Suggest", width=8, command=lambda n=n: self._hb_suggest(n)).grid(row=row, column=8, padx=3)
+        ttk.Label(body, text="Tip: 'Suggest' fills in sensible settings for the item you picked. Item "
+                  "durations are typical values; check them in your game.", style="Hint.TLabel").pack(anchor="w")
+        self.binder.bind(("hotbar", "slots"), self._hb_get, self._hb_set)
+
+    def _hb_suggest(self, n: int) -> None:
+        r = self._hb_rows[n]
+        info = self.item_db.get(r["item"].get())
+        if not info:
+            messagebox.showinfo("Hotbar", "Pick an item from the list first.")
+            return
+        r["use_when"].set(info.get("suggest", "never"))
+        r["every_s"].set(float(info.get("every_s", 60)))
+
+    def _hb_get(self) -> list[dict]:
+        out = []
+        for n, r in self._hb_rows.items():
+            item, when = r["item"].get().strip(), r["use_when"].get()
+            if not item and when == "never":
+                continue
+            out.append({"slot": n, "item": item, "use_when": when, "every_s": _f2(r["every_s"].get()),
+                        "max_per_round": int(r["max_per_round"].get()), "from_round": int(r["from_round"].get()),
+                        "low_time_s": _f2(r["low_time_s"].get()),
+                        "only_during_rounds": bool(r["only_during_rounds"].get())})
+        return out
+
+    def _hb_set(self, slots: list[dict]) -> None:
+        by = {s["slot"]: s for s in slots}
+        for n, r in self._hb_rows.items():
+            s = by.get(n, {})
+            r["item"].set(s.get("item", ""))
+            r["use_when"].set(s.get("use_when", "never"))
+            r["every_s"].set(s.get("every_s", 60.0))
+            r["max_per_round"].set(s.get("max_per_round", 0))
+            r["from_round"].set(s.get("from_round", 1))
+            r["low_time_s"].set(s.get("low_time_s", 60.0))
+            r["only_during_rounds"].set(s.get("only_during_rounds", True))
+
+    # --------------------------------------------------------------- combat
+    def _tab_combat(self) -> None:
+        body = self._settings_tab("Combat", "How to dodge and fight Robo Bear's mobs. Tactics come from "
+                                  "the Bee Swarm Simulator wiki.")
+        sec = self._section(body, "Dodging")
+        self._bvar(("combat", "dodge_enabled"), "Dodge mob attacks", sec, 0)
+        self._combo(("combat", "mechsquito_dodge"), "Vs Mechsquitos", sec, 1, ["circle", "zigzag", "none"],
+                    "they aim where you ARE, so keep moving", width=10)
+        self._num(("combat", "dodge_radius"), "Dodge pattern size", sec, 2, 0.2, 3.0, 0.1, True)
+        self._num(("combat", "dodge_at_toxin_stacks"), "Start dodging at toxin stacks", sec, 3, 0, 10,
+                  hint="0 = as soon as one is seen")
+        self._bvar(("combat", "sidestep_cogturrets"), "Sidestep Cogturret shots (they fire straight ahead)", sec, 4)
+        self._num(("combat", "sidestep_s"), "Sidestep for (s)", sec, 5, 0.1, 3, 0.1, True)
+        self._bvar(("combat", "avoid_cogmowers"), "Step out of Cogmower paths", sec, 6)
+        self._bvar(("combat", "jump_while_dodging"), "Jump while dodging", sec, 7)
+        self._num(("combat", "leave_field_at_toxin_stacks"), "Leave the field at toxin stacks", sec, 8, 0, 10,
+                  hint="0 = never")
+
+        sec = self._section(body, "Fighting")
+        self._bvar(("combat", "stand_near_mobs"), "Walk near mobs so bees lock on", sec, 0)
+        self._bvar(("combat", "prioritize_cogturrets"), "Kill Cogturrets first (they pile up)", sec, 1)
+        self._bvar(("combat", "hunt_golden_cogmower"), "Hunt the Golden Cogmower (14-20 Cogs)", sec, 2)
+        self._num(("combat", "golden_max_detour_s"), "Max detour for it (s)", sec, 3, 0, 120, 5, True)
+
+        sec = self._section(body, "Distances (field units, 1 ≈ your character's width)")
+        self._num(("combat", "danger_line_width"), "Shot / path half-width", sec, 0, 0.5, 5, 0.1, True)
+        self._num(("combat", "cogmower_alert_range"), "Cogmower alert range", sec, 1, 1, 15, 0.5, True)
+        self._num(("combat", "approach_min_dist"), "Close enough to a mob", sec, 2, 0.5, 10, 0.5, True)
+        self._num(("combat", "approach_range"), "Max distance to walk to a mob", sec, 3, 1, 30, 0.5, True)
+
+        mobs = (self.rules.raw.get("mobs", {}) if self.rules else {})
+        if mobs:
+            sec = self._section(body, "Mob guide")
+            for i, (name, m) in enumerate(mobs.items()):
+                when = (f"from round {m['from_round']}" if "from_round" in m
+                        else "rounds " + " / ".join("-".join(map(str, w)) for w in m.get("spawn_rounds", [])))
+                tip = m.get("dodge") or m.get("tip", "")
+                ttk.Label(sec, text=name, style="H2.TLabel").grid(row=i * 2, column=0, sticky="w", pady=(6, 0))
+                ttk.Label(sec, text=when, style="Muted.TLabel").grid(row=i * 2, column=1, sticky="w", padx=10)
+                ttk.Label(sec, text=tip, wraplength=760).grid(row=i * 2 + 1, column=0, columnspan=3, sticky="w")
+
+    # ------------------------------------------------------------ screenshot
+    def _screenshot(self) -> None:
+        delay = self.cfg_mgr.config.capture.screenshot_delay_s
+        self.btn_shot.configure(state="disabled")
+        self.log.action(f"Screenshot in {delay} s: click into Roblox now")
+        self._shot_countdown(delay)
+
+    def _shot_countdown(self, left: int) -> None:
+        if left > 0:
+            self.btn_shot.configure(text=f"📸 {left}…")
+            self.root.after(1000, self._shot_countdown, left - 1)
+            return
+        self.btn_shot.configure(text="📸 …")
+        threading.Thread(target=self._shot_worker, daemon=True).start()
+
+    def _shot_worker(self) -> None:
+        cfg = self.cfg_mgr.config
+        folder = None
+        try:
+            from ..perception.capture import ScreenCapture
+            from ..perception.debug_dump import DebugDumper, overlay_regions
+            cap = ScreenCapture(cfg)
+            w = cap.locate(force=True)
+            full = cap.grab_client(fresh=True)
+            dump = DebugDumper(cfg)
+            p = dump.save(full.image, "client")
+            dump.save(overlay_regions(full.image, cfg, cap.client), "regions_overlay")
+            if cfg.capture.save_region_crops:
+                for name in cfg.regions:
+                    dump.save(cap.grab_region(name).image, f"region_{name}")
+            folder = p.parent
+            self.log.action("Screenshot saved", size=f"{w.width}x{w.height}", dpi=f"{w.dpi_scale:.2f}",
+                            focused=w.focused, folder=str(folder))
+            if not w.focused:
+                self.log.warning("Roblox wasn't the active window. If the image shows something "
+                                 "else on top, try again and click into Roblox during the countdown.")
+        except Exception as exc:  # show any failure in the log, never crash the GUI
+            self.log.error(f"Screenshot failed: {exc}")
+        self.root.after(0, self._shot_done, folder)
+
+    def _shot_done(self, folder) -> None:
+        self.btn_shot.configure(state="normal", text="📸 Screenshot")
+        if folder is not None:
+            self._open_path(folder)
 
     # -------------------------------------------------------------- farming
     def _tab_farming(self) -> None:
@@ -666,6 +850,13 @@ class ControlPanel:
         self._bvar(("window", "require_focus"), "Only send input while Roblox is focused", sec, 1)
         self._bvar(("window", "refocus_automatically"), "Re-focus Roblox automatically (else pause)", sec, 2)
         self._bvar(("debug", "save_screenshots_on_failure"), "Save a screenshot when something fails", sec, 3)
+
+        sec = self._section(body, "Screen capture")
+        self._num(("capture", "screenshot_delay_s"), "Screenshot countdown (s)", sec, 0, 0, 30,
+                  hint="time to click into Roblox after pressing 📸")
+        self._bvar(("capture", "save_region_crops"), "Also save each screen region on its own", sec, 1)
+        self._num(("capture", "cache_max_age_ms"), "Reuse a grab for (ms)", sec, 2, 0, 2000, 10)
+        self._num(("debug", "max_screenshots"), "Keep at most N debug images", sec, 3, 0, 5000, 10, hint="0 = keep all")
 
     # ================================================================== loop
     def _tick(self) -> None:
