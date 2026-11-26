@@ -1,0 +1,56 @@
+{
+  "_source": "Bee Swarm Simulator bee list (colour + rarity). Edit freely if the game adds bees; the GUI reads this file.",
+  "bees": {
+    "Basic":     {"color": "white", "rarity": "common"},
+
+    "Bomber":    {"color": "white", "rarity": "rare"},
+    "Brave":     {"color": "white", "rarity": "rare"},
+    "Bumble":    {"color": "blue",  "rarity": "rare"},
+    "Cool":      {"color": "blue",  "rarity": "rare"},
+    "Hasty":     {"color": "white", "rarity": "rare"},
+    "Looker":    {"color": "white", "rarity": "rare"},
+    "Rad":       {"color": "red",   "rarity": "rare"},
+    "Rascal":    {"color": "red",   "rarity": "rare"},
+    "Stubborn":  {"color": "white", "rarity": "rare"},
+
+    "Bubble":    {"color": "blue",  "rarity": "epic"},
+    "Bucko":     {"color": "blue",  "rarity": "epic"},
+    "Commander": {"color": "white", "rarity": "epic"},
+    "Demo":      {"color": "white", "rarity": "epic"},
+    "Exhausted": {"color": "white", "rarity": "epic"},
+    "Fire":      {"color": "red",   "rarity": "epic"},
+    "Frosty":    {"color": "blue",  "rarity": "epic"},
+    "Honey":     {"color": "white", "rarity": "epic"},
+    "Rage":      {"color": "red",   "rarity": "epic"},
+    "Riley":     {"color": "red",   "rarity": "epic"},
+    "Shocked":   {"color": "white", "rarity": "epic"},
+
+    "Baby":      {"color": "white", "rarity": "legendary"},
+    "Carpenter": {"color": "white", "rarity": "legendary"},
+    "Demon":     {"color": "red",   "rarity": "legendary"},
+    "Diamond":   {"color": "blue",  "rarity": "legendary"},
+    "Lion":      {"color": "white", "rarity": "legendary"},
+    "Music":     {"color": "white", "rarity": "legendary"},
+    "Ninja":     {"color": "blue",  "rarity": "legendary"},
+    "Shy":       {"color": "red",   "rarity": "legendary"},
+
+    "Buoyant":   {"color": "blue",  "rarity": "mythic"},
+    "Fuzzy":     {"color": "white", "rarity": "mythic"},
+    "Precise":   {"color": "red",   "rarity": "mythic"},
+    "Spicy":     {"color": "red",   "rarity": "mythic"},
+    "Tadpole":   {"color": "blue",  "rarity": "mythic"},
+    "Vector":    {"color": "white", "rarity": "mythic"},
+
+    "Bear":      {"color": "white", "rarity": "event"},
+    "Cobalt":    {"color": "blue",  "rarity": "event"},
+    "Crimson":   {"color": "red",   "rarity": "event"},
+    "Digital":   {"color": "white", "rarity": "event"},
+    "Festive":   {"color": "red",   "rarity": "event"},
+    "Gummy":     {"color": "white", "rarity": "event"},
+    "Photon":    {"color": "white", "rarity": "event"},
+    "Puppy":     {"color": "white", "rarity": "event"},
+    "Tabby":     {"color": "white", "rarity": "event"},
+    "Vicious":   {"color": "blue",  "rarity": "event"},
+    "Windy":     {"color": "white", "rarity": "event"}
+  }
+}

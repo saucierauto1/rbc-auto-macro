@@ -4,7 +4,27 @@ A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
 the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
 full design, the state table and the capability matrix.
 
-**Current stage: 1 of 16 (architecture + configuration).**
+**Current stage: 1 of 16 (architecture + configuration) + settings GUI and decision logic.**
+
+> **Why START doesn't run anything yet:** this build has no screen capture, OCR,
+> keyboard/mouse input or state machine (stages 2-8). START opens a pre-flight
+> check that lists exactly what is ready and what is still missing. Everything you
+> set in the tabs is saved to `config/config.json` and will be used once those stages land.
+
+## Control panel tabs
+| Tab | What you set |
+|---|---|
+| Dashboard | Live status, START (pre-flight check), log |
+| Hive | Your bees (count / gifted / level), detected hive colour, Digital Bee check |
+| Bee Picks | Bees to pick first (ordered), bees to avoid, gifted / colour preference, rerolls |
+| Quests & Fields | Quest priority, free-reroll rule, field bias + blacklist, field scoring weights |
+| Upgrades | Priority upgrades (bought first, LOCKED if unaffordable), never-buy list, Cog reserve, rarity multipliers, strategy profile |
+| Drives | Auto-buy + use drives **only when Digital Bee is in your hive**; which drive (auto = hive colour, glitched for mixed), when, limits, hotbar slot, fallback order |
+| Farming | Backpack thresholds, farm pattern, token values |
+| Controls | Hotkeys, in-game keys, run limits, window |
+
+Decision logic for these lives in `rbc_agent/decision/` (`drives.py`, `picks.py`) and
+`rbc_agent/game/hive.py`, and is unit-tested without Roblox.
 
 ## Requirements
 * Python 3.10+ (Windows for the live agent from Stage 2; Stage 1 runs anywhere)
@@ -23,7 +43,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (42 tests)
+python -m pytest -q                    # run the test suite (58 tests)
 ```
 
 ## Configuring
