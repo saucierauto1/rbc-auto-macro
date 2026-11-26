@@ -1,8 +1,8 @@
 @echo off
 REM Builds dist\RBCAgent\RBCAgent.exe with the config and data folders next to it.
 cd /d "%~dp0"
-echo Installing PyInstaller...
-python -m pip install --upgrade pyinstaller || goto :fail
+echo Installing PyInstaller and requirements...
+python -m pip install --upgrade pyinstaller -r requirements.txt || goto :fail
 echo Building...
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name RBCAgent main.py || goto :fail
 set OUT=dist\RBCAgent

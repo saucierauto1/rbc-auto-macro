@@ -416,7 +416,12 @@
     "prefer_gifted": true,
     "prefer_hive_color": true,
     "reroll_if_no_priority": false,
-    "max_reroll_cogs": 0
+    "max_reroll_cogs": 0,
+    "priority_base": 100.0,
+    "priority_step": 3.0,
+    "rarity_weight": 2.0,
+    "color_match_bonus": 6.0,
+    "gifted_bonus": 8.0
   },
   "quests": {
     "priority": [
@@ -443,7 +448,12 @@
       "rare": 1.0,
       "epic": 1.1,
       "legendary": 1.25
-    }
+    },
+    "base_score": 10.0,
+    "hive_color_mult": 1.3,
+    "off_color_mult": 0.5,
+    "priority_bonus": 1000.0,
+    "priority_step": 10.0
   },
   "drives": {
     "enabled": true,
@@ -461,6 +471,37 @@
     "min_cog_reserve": 0,
     "use_right_after_buying": true,
     "hotbar_slot": 0
+  },
+  "hotbar": {
+    "enabled": true,
+    "slots": [],
+    "min_gap_s": 0.4,
+    "mobs_nearby_count": 2,
+    "backpack_full_at": 0.95
+  },
+  "combat": {
+    "dodge_enabled": true,
+    "mechsquito_dodge": "circle",
+    "dodge_radius": 1.0,
+    "dodge_at_toxin_stacks": 0,
+    "sidestep_cogturrets": true,
+    "sidestep_s": 0.6,
+    "avoid_cogmowers": true,
+    "stand_near_mobs": true,
+    "prioritize_cogturrets": true,
+    "jump_while_dodging": false,
+    "hunt_golden_cogmower": true,
+    "golden_max_detour_s": 25.0,
+    "leave_field_at_toxin_stacks": 8,
+    "danger_line_width": 1.5,
+    "cogmower_alert_range": 4.0,
+    "approach_min_dist": 2.0,
+    "approach_range": 6.0
+  },
+  "capture": {
+    "cache_max_age_ms": 50,
+    "screenshot_delay_s": 3,
+    "save_region_crops": true
   },
   "timeouts_s": {
     "STARTING_ROBO_BEAR": 20.0,

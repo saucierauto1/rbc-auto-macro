@@ -10,7 +10,7 @@ from .paths import CALIBRATION_FILE
 # Flip these as later stages land. The GUI only enables real automation when
 # every entry is True.
 ENGINE_PARTS: dict[str, bool] = {
-    "Screen capture (Stage 2)": False,
+    "Screen capture (Stage 2)": True,
     "OCR + template matching (Stage 3)": False,
     "State machine (Stage 5)": False,
     "Keyboard/mouse input (Stage 6)": False,
@@ -30,7 +30,8 @@ class Check:
 def run_preflight(cfg: AppConfig, find_window=None) -> list[Check]:
     from ..game.hive import HiveProfile
     if find_window is None:
-        from ..perception.window import find_window
+        from ..perception.window import find_window as _fw
+        find_window = lambda t: _fw(t, cfg.window.process_name)  # noqa: E731
     checks: list[Check] = [Check("Config", True, "config.json is valid")]
 
     win = find_window(cfg.window.title_contains)
@@ -39,6 +40,24 @@ def run_preflight(cfg: AppConfig, find_window=None) -> list[Check]:
     else:
         checks.append(Check("Roblox window", not win.minimized,
                             f"{win.width}x{win.height}" + (" (minimised!)" if win.minimized else "")))
+        ratio = win.width / win.height if win.height else 0
+        if win.height and not 1.6 <= ratio <= 1.85:
+            checks.append(Check("Window shape", True, f"{ratio:.2f}:1, regions are tuned for 16:9; "
+                                "calibrate or use a 16:9 size", blocking=False))
+        if win.height and win.height < 600:
+            checks.append(Check("Window size", True, "small window: text may be too small to read",
+                                blocking=False))
+    try:
+        from ..perception.capture import backend_available
+        cap_ok = backend_available()
+    except ImportError:
+        cap_ok = False
+    if not cap_ok:
+        checks.append(Check("Capture library", False, "mss/numpy missing: pip install -r requirements.txt"))
+    hk = cfg.hotbar
+    used = [s for s in hk.slots if s.use_when != "never"]
+    if hk.enabled and used:
+        checks.append(Check("Hotbar", True, f"{len(used)} slot(s) set to auto-use", blocking=False))
 
     hive = HiveProfile.from_config(cfg.hive)
     checks.append(Check("Hive entered", hive.total > 0,

@@ -205,7 +205,7 @@ is logged, so you can always see *why* the agent chose what it did.
 | Upgrade numeric effects not displayed | Values come from `rbc_rules.json`, written and tuned by you |
 
 > **Game knowledge:** `data/rbc_rules.json` holds the published rules (25 rounds,
-> 300 s per round, bonus Cogs under 120 s, the fixed rounds 5/10/15/20, mobs,
+> 300 s per round, bonus Cogs under 3:45 (225 s), the fixed rounds 5/10/15/20, mobs,
 > drives, rarity weights) and all 68 upgrades with structured effects, generated
 > by `tools/build_rules.py` from the BSS wiki. Each round runs:
 > **quest choice → bee picks → upgrades → play.**
@@ -237,8 +237,8 @@ Stage 1 uses **only the standard library**, so it runs anywhere.
 | # | Stage | Main deliverable | Status |
 |---|---|---|---|
 | 1 | Architecture + configuration | this document, typed config, logger, timing, errors | **done** |
-| 2 | Window + screenshot | window finder, DPI, ROI capture, frame cache, debug dumps | next |
-| 3 | Basic perception | template matcher, OCR wrapper, scheduler, calibration tool | |
+| 2 | Window + screenshot | window finder, DPI, ROI capture, frame cache, debug dumps | **done** |
+| 3 | Basic perception | template matcher, OCR wrapper, scheduler, calibration tool | next |
 | 4 | Game-state models | GameState, HiveProfile, RoundState, Token, Buff, Upgrade, Decision | |
 | 5 | State machine | State base class, timeouts, transitions, confidence gating | |
 | 6 | Input controller | SendInput, held-key ledger, stop_all_input | |

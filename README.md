@@ -4,12 +4,24 @@ A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
 the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
 full design, the state table and the capability matrix.
 
-**Current stage: 1 of 16 (architecture + configuration) + settings GUI and decision logic.**
+**Current stage: 2 of 16 (window + screen capture) + settings GUI and decision logic.**
 
 > **Why START doesn't run anything yet:** this build has no screen capture, OCR,
 > keyboard/mouse input or state machine (stages 2-8). START opens a pre-flight
 > check that lists exactly what is ready and what is still missing. Everything you
 > set in the tabs is saved to `config/config.json` and will be used once those stages land.
+
+## Stage 2: screen capture
+* `perception/window.py` finds the Roblox window (by title, or by the `RobloxPlayerBeta.exe`
+  process), makes the app DPI-aware, and reads the client area's position, size and focus.
+* `perception/capture.py` grabs the client area or any config region with `mss`, as BGR numpy
+  arrays, with a short frame cache so detectors share one grab per tick.
+* `perception/regions.py` maps normalised config regions to screen pixels.
+* `perception/debug_dump.py` saves PNGs (with region overlays) and keeps `debug/` under
+  `debug.max_screenshots`.
+* **📸 Screenshot** on the Dashboard: counts down (Controls tab), then saves the game screen,
+  a copy with every region outlined, and one image per region into `debug/`. Use it to
+  send the screenshots needed for Stage 3.
 
 ## Control panel tabs
 | Tab | What you set |
@@ -19,6 +31,8 @@ full design, the state table and the capability matrix.
 | Bee Picks | Bees to pick first (ordered), bees to avoid, gifted / colour preference, rerolls |
 | Quests & Fields | Quest priority, free-reroll rule, field bias + blacklist, field scoring weights |
 | Upgrades | Priority upgrades (bought first, LOCKED if unaffordable), never-buy list, Cog reserve, rarity multipliers, strategy profile |
+| Hotbar | What is in slots 1-7 and when to use it (round start, while farming, at hive, backpack full, mobs nearby, fixed rounds, time running out), cooldowns, per-round limits |
+| Combat | Dodging (circle/zigzag vs Mechsquitos, sidestep Cogturrets and Cogmowers), fighting (walk near mobs, turrets first, Golden Cogmower hunt), mob guide |
 | Drives | Auto-buy + use drives **only when Digital Bee is in your hive**; which drive (auto = hive colour, glitched for mixed), when, limits, hotbar slot, fallback order |
 | Farming | Backpack thresholds, farm pattern, token values |
 | Controls | Hotkeys, in-game keys, run limits, window |
@@ -43,7 +57,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (58 tests)
+python -m pytest -q                    # run the test suite (74 tests)
 ```
 
 ## Configuring
