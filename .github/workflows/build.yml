@@ -1,0 +1,50 @@
+# Builds RBCAgent.exe on GitHub's Windows machines every time you upload changes,
+# and publishes RBCAgent.zip on the repository's "Releases" page.
+name: Build RBCAgent.exe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # also adds a "Run workflow" button on the Actions tab
+
+permissions:
+  contents: write           # needed to publish the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: python -m pip install --upgrade pip pyinstaller pytest
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build exe
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RBCAgent main.py
+
+      - name: Assemble RBCAgent folder
+        shell: pwsh
+        run: |
+          $out = "release/RBCAgent"
+          New-Item -ItemType Directory -Force -Path $out, "$out/logs", "$out/debug" | Out-Null
+          Copy-Item dist/RBCAgent.exe $out
+          Copy-Item config $out -Recurse
+          Copy-Item data $out -Recurse
+          Remove-Item "$out/config/config.json" -ErrorAction SilentlyContinue
+          Compress-Archive -Path $out -DestinationPath release/RBCAgent.zip -Force
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: RBC Agent build ${{ github.run_number }}
+          body: Download **RBCAgent.zip**, unzip it and run **RBCAgent.exe**.
+          files: release/RBCAgent.zip
+          make_latest: true
