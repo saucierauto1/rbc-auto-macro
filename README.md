@@ -1,1 +1,60 @@
-# rbc-auto-macro
+# RBC Agent
+
+A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
+the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
+full design, the state table and the capability matrix.
+
+**Current stage: 1 of 16 (architecture + configuration).**
+
+## Requirements
+* Python 3.10+ (Windows for the live agent from Stage 2; Stage 1 runs anywhere)
+* `pip install -r requirements.txt` (Stage 1 only needs `pytest`)
+
+## Make the .exe (Windows)
+Double-click **`build_exe.bat`**. It installs PyInstaller, builds the program and opens
+`dist\RBCAgent\` containing `RBCAgent.exe` plus the `config` and `data` folders.
+Keep those folders next to the exe. Rebuild after every new stage.
+
+## Run
+```bash
+python main.py                         # open the control panel window
+```
+```bash
+python main.py --check-config          # validate your config, print a summary
+python main.py --print-config          # see the fully merged config
+python main.py --write-default-config  # regenerate config/default_config.json
+python -m pytest -q                    # run the test suite (42 tests)
+```
+
+## Configuring
+* `config/default_config.json` is a generated reference of every setting. **Don't edit it.**
+* `config/config.json` holds **your overrides only**. Example:
+```json
+{
+  "_comment": "keys starting with _ are ignored",
+  "strategy": { "profile": "BLUE" },
+  "pollen":   { "must_return_above": 0.97 },
+  "hotkeys":  { "emergency_stop": "F12" },
+  "timeouts_s": { "WAITING_FOR_RBC": 20 }
+}
+```
+Typos, wrong types and impossible values are rejected with a clear message,
+for example `poln: unknown setting (did you mean 'pollen'?)`.
+
+* `data/rbc_rules.json` holds game knowledge (fields, objective text patterns, upgrades).
+  The upgrade entries are **placeholders**. Fill them in from what the RBC shop actually shows.
+
+## Stage 1 contents
+| File | What it does |
+|---|---|
+| `core/config.py` | Typed frozen dataclasses (single source of defaults), strict parser, per-section validation, deep-merge overrides, thread-safe hot reload that keeps the old config on error |
+| `core/timing.py` | `wait_until`, `wait_for_change`, `Deadline`, `RateGate` (per-detector Hz), `CancelToken` (pause/stop; pause time doesn't eat timeouts), `FakeClock` for instant tests |
+| `core/logger.py` | `[HH:MM:SS] CATEGORY message key=value` format to console, rotating file and a non-blocking GUI queue |
+| `core/states.py` | `AgentState` and `StrategyProfile` enums |
+| `core/errors.py` | Exception hierarchy (`ConfigError`, `OperationTimeout`, `AutomationCancelled`, `WindowLostError`, …) |
+
+## Known limitations (Stage 1)
+* There is no game interaction yet: no capture, input or state machine.
+* The default `regions` are guesses for a 16:9 HUD. The Stage 3 calibration tool replaces them.
+* Type errors are reported first. Range checks run once types are valid, so a badly broken file can take two passes to fix.
+* Upgrade data comes from the BSS wiki (68 upgrades). Prices, reroll costs and exact quest wording are not published; prices are read on screen, quest regexes need checking in-game.

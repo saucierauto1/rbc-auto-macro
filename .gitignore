@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+logs/*
+!logs/.gitkeep
+debug/*
+!debug/.gitkeep
+config/config.json

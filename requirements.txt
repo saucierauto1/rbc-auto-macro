@@ -1,0 +1,12 @@
+# Stage 1 needs only the Python standard library (3.10+).
+# Development
+pytest>=7
+
+# Needed from Stage 2 on (Windows):
+# mss>=9
+# numpy>=1.26
+# opencv-python>=4.9
+# pynput>=1.7
+# Stage 3 (OCR, pick one):
+# pytesseract>=0.3   (plus the Tesseract binary)
+# easyocr>=1.7
