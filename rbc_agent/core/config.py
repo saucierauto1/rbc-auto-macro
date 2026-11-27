@@ -117,6 +117,9 @@ class DetectionConfig:
     transition_threshold: float = 0.75
     # Evidence must hold for this many consecutive perception frames.
     confirm_frames: int = 3
+    # A round number that jumps (3 -> 7) is ignored as a misread, unless it keeps
+    # being read this many times in a row; then it is believed after all.
+    jump_accept_reads: int = 8
     # Below this overall confidence the game state counts as UNKNOWN.
     unknown_state_threshold: float = 0.40
     # Seconds of unknown state before recovery is triggered.
@@ -149,8 +152,8 @@ class DetectionConfig:
             v = getattr(self, n)
             if not 0.0 < v <= 1.0:
                 p.append(f"{n}={v} must be in (0, 1]")
-        if self.confirm_frames < 1:
-            p.append("confirm_frames must be >= 1")
+        if self.confirm_frames < 1 or self.jump_accept_reads < 1:
+            p.append("confirm_frames and jump_accept_reads must be >= 1")
         if self.unknown_state_grace_s < 0:
             p.append("unknown_state_grace_s must be >= 0")
         for group, weights in self.confidence_weights.items():
@@ -493,6 +496,9 @@ class UpgradeConfig:
     blacklist: list[str] = field(default_factory=list)
     auto_buy: bool = True
     lock_unaffordable_priority: bool = True
+    # Never buy a blue upgrade for a red hive or a red one for a blue hive
+    # (unless it is on your priority list). They usually make your hive worse.
+    skip_off_color: bool = True
     # Always keep at least this many Cogs after a purchase.
     min_cog_reserve: int = 0
     max_rerolls_per_round: int = 0

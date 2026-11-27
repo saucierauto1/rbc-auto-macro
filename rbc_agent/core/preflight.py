@@ -40,7 +40,7 @@ def run_preflight(cfg: AppConfig, find_window=None) -> list[Check]:
         checks.append(Check("Roblox window", not win.minimized,
                             f"{win.width}x{win.height}" + (" (minimised!)" if win.minimized else "")))
         ratio = win.width / win.height if win.height else 0
-        if win.height and not 1.6 <= ratio <= 1.85:
+        if win.height and not 1.6 <= ratio <= 1.95:
             checks.append(Check("Window shape", True, f"{ratio:.2f}:1, regions are tuned for 16:9; "
                                 "other shapes are untested, a 16:9 size is safest", blocking=False))
         if win.height and win.height < 600:

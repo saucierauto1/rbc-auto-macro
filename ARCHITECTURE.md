@@ -240,8 +240,8 @@ Stage 1 uses **only the standard library**, so it runs anywhere.
 | 1 | Architecture + configuration | this document, typed config, logger, timing, errors | **done** |
 | 2 | Window + screenshot | window finder, DPI, ROI capture, frame cache, debug dumps | **done** |
 | 3 | Basic perception | OCR, RBC screen reader (anchor-based, no calibration needed), Read screen button. Templates moved to stage 10, scheduler to stage 5 | **done** |
-| 4 | Game-state models | GameState, HiveProfile, RoundState, Token, Buff, Upgrade, Decision | next |
-| 5 | State machine | State base class, timeouts, transitions, confidence gating | |
+| 4 | Game-state models | RunState (confirmed reads, round plausibility, run memory) → immutable GameState; Watch button. Token/Buff models move to stage 10 | **done** |
+| 5 | State machine | State base class, timeouts, transitions, confidence gating | next |
 | 6 | Input controller | SendInput, held-key ledger, stop_all_input | |
 | 7 | Movement | routes, checkpoints, stuck detection, re-centring | |
 | 8 | RBC detection | round/shop/end screen classifiers | |

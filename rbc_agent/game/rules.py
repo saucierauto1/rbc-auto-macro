@@ -74,6 +74,11 @@ class RBCRules:
         """Field name -> dominant colour."""
         return {k: v["color"] for k, v in self.raw["fields"].items()}
 
+    @property
+    def mobs(self) -> dict[str, dict[str, Any]]:
+        """Mob name -> facts from the wiki (spawn rounds, damage, dodge tips). Empty if absent."""
+        return self.raw.get("mobs", {})
+
     @cached_property
     def upgrades(self) -> dict[str, UpgradeDef]:
         out = {}

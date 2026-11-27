@@ -216,7 +216,7 @@ def test_dodge_cogmower_path_and_approach_priority():
 
 
 def test_golden_cogmower_fields():
-    mobs = RBCRules.load().raw["mobs"]
+    mobs = RBCRules.load().mobs
     assert "Clover Field" in golden_cogmower_fields(4, set(), mobs, CombatConfig())
     assert golden_cogmower_fields(4, {0}, mobs, CombatConfig()) == []
     assert golden_cogmower_fields(5, set(), mobs, CombatConfig()) == []

@@ -4,7 +4,7 @@ A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
 the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
 full design, the state table and the capability matrix.
 
-**Current stage: 3 of 16 (reading the RBC screens with OCR) + settings GUI and decision logic.**
+**Current stage: 4 of 16 (tracking the run) + settings GUI and decision logic.**
 
 > **Why START doesn't run anything yet:** this build can see and read the game, but has no
 > keyboard/mouse input or state machine yet (stages 5-8). START opens a pre-flight
@@ -36,6 +36,18 @@ full design, the state table and the capability matrix.
   quest wording in `data/rbc_rules.json` (`objective_patterns`).
 * Tesseract comes inside `RBCAgent.zip` (the `tesseract` folder). Running from source? Install it
   from https://github.com/UB-Mannheim/tesseract/wiki (or set `ocr.tesseract_path`).
+
+## Stage 4: tracking the run
+* **👁 Watch** on the Dashboard: play RBC normally and the agent follows along (it presses
+  nothing). The Dashboard shows the round, Cogs, time left and quest, and the log lists what
+  changed ("Round 4", "Quest: collect 225,000 pollen (Quest B)"). Click again to stop.
+* `game/state.py`: `RunState` remembers the run. A read only counts after
+  `detection.confirm_frames` reads in a row agree, so one OCR slip changes nothing. The round
+  can only stay or go up by one; a jump is ignored as a misread unless it keeps being read
+  (`detection.jump_accept_reads`). Round 1 on the quest screen starts a new run.
+  `snapshot()` gives the immutable `GameState` the decision layer will use.
+* Upgrades tab: **Never buy the other colour** (on by default): no blue upgrades for a red
+  hive, or the reverse, unless they are on your priority list.
 
 ## Control panel tabs
 | Tab | What you set |
@@ -71,7 +83,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (93 tests)
+python -m pytest -q                    # run the test suite (105 tests)
 ```
 
 ## Configuring

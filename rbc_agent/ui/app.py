@@ -23,6 +23,7 @@ from .. import __version__
 from ..core.config import (DRIVE_TYPES, HOTBAR_WHEN, QUEST_TYPES, AppConfig, BeeEntry, ConfigManager,
                            DriveConfig, HiveConfig, parse_config, to_dict)
 from ..core.errors import ConfigError
+from ..core.timing import CancelToken
 from ..core.logger import Category, LogEvent, setup_logging
 from ..core.paths import DATA_DIR, LOGS_DIR, USER_CONFIG_FILE
 from ..core.preflight import can_start, run_preflight
@@ -49,6 +50,7 @@ QUEST_LABELS = {
 }
 SHOT_LABEL = "📸 Screenshot"
 READ_LABEL = "🔍 Read screen"
+WATCH_LABEL = "👁 Watch"
 DRIVE_LABELS = {"red": "Red Drive", "blue": "Blue Drive", "white": "White Drive", "glitched": "Glitched Drive"}
 HOTKEYS = [f"F{i}" for i in range(1, 13)] + ["PAUSE", "SCROLL_LOCK", "INSERT", "HOME", "END"]
 RARITY_TAG = {"common": "C", "rare": "R", "epic": "E", "legendary": "L", "mythic": "M", "event": "Ev"}
@@ -257,7 +259,11 @@ class ControlPanel:
         self.btn_reload = ttk.Button(bar, text="⟳ Reload config", command=self._reload_config)
         self.btn_read = ttk.Button(bar, text=READ_LABEL, command=self._read_screen)
         self.btn_shot = ttk.Button(bar, text=SHOT_LABEL, command=self._screenshot)
-        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_read, self.btn_reload):
+        self.btn_watch = ttk.Button(bar, text=WATCH_LABEL, command=self._toggle_watch)
+        self._watch_token: CancelToken | None = None
+        self._watch_done = threading.Event()
+        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_read, self.btn_watch,
+                  self.btn_reload):
             b.pack(side="left", padx=(0, 6))
         self.debug_var = tk.BooleanVar(value=self.cfg_mgr.config.debug.enabled)
         ttk.Checkbutton(bar, text="Debug mode", variable=self.debug_var,
@@ -540,10 +546,12 @@ class ControlPanel:
         sec = self._section(body, "Shop behaviour")
         self._bvar(("upgrades", "auto_buy"), "Auto-buy upgrades", sec, 0)
         self._bvar(("upgrades", "lock_unaffordable_priority"), "LOCK priority upgrades I can't afford yet", sec, 1)
-        self._num(("upgrades", "min_cog_reserve"), "Keep at least this many Cogs", sec, 2, 0, 9999)
-        self._num(("upgrades", "max_rerolls_per_round"), "Max shop rerolls per round", sec, 3, 0, 20)
+        self._bvar(("upgrades", "skip_off_color"),
+                   "Never buy the other colour (no blue upgrades for a red hive, and the reverse)", sec, 2)
+        self._num(("upgrades", "min_cog_reserve"), "Keep at least this many Cogs", sec, 3, 0, 9999)
+        self._num(("upgrades", "max_rerolls_per_round"), "Max shop rerolls per round", sec, 4, 0, 20)
         rb = ttk.Frame(sec)
-        rb.grid(row=4, column=0, columnspan=4, sticky="w", pady=(8, 0))
+        rb.grid(row=5, column=0, columnspan=4, sticky="w", pady=(8, 0))
         ttk.Label(rb, text="Rarity multipliers:").grid(row=0, column=0, sticky="w", padx=(0, 10))
         for i, r in enumerate(("common", "rare", "epic", "legendary")):
             self._num(("upgrades", "rarity_bias", r), r.title(), rb, 0, 0, 5, 0.05, True, col=1 + i * 2, width=5)
@@ -738,7 +746,7 @@ class ControlPanel:
         self._num(("combat", "approach_min_dist"), "Close enough to a mob", sec, 2, 0.5, 10, 0.5, True)
         self._num(("combat", "approach_range"), "Max distance to walk to a mob", sec, 3, 1, 30, 0.5, True)
 
-        mobs = (self.rules.raw.get("mobs", {}) if self.rules else {})
+        mobs = self.rules.mobs if self.rules else {}
         if mobs:
             sec = self._section(body, "Mob guide")
             for i, (name, m) in enumerate(mobs.items()):
@@ -774,37 +782,79 @@ class ControlPanel:
 
     def _read_worker(self) -> None:
         cfg = self.cfg_mgr.config
-        cap = None
         try:
-            from ..game.screens import parse_screen
-            from ..perception.capture import ScreenCapture
+            from ..game.perceive import Perceiver
             from ..perception.debug_dump import DebugDumper, draw_box
-            from ..perception.ocr import Tesseract
-            from ..perception.screen_reader import ScreenReader
             from .screen_report import describe
             if self.rules is None:
                 raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
-            reader = ScreenReader(Tesseract(cfg.ocr), cfg.ocr)
-            cap = ScreenCapture(cfg)
-            cap.locate(force=True)
-            frame = cap.grab_client(fresh=True)
-            raw = reader.read(frame.image)
-            catalog = load_catalog()
-            st = parse_screen(raw.kind, raw.texts, raw.shop_rows, self.rules, catalog)
-            for line in describe(st, cfg, self.rules, catalog):
+            with Perceiver(cfg, self.rules) as eyes:   # closes the screen capture even on errors
+                r = eyes.read()
+            for line in describe(r.state, cfg, self.rules, eyes.catalog):
                 self.log.detect(line)
-            if raw.boxes:      # save what was read, with boxes, for checking or sending in
-                marked = frame.image.copy()
-                for rect in raw.boxes.values():
+            if r.raw.boxes:    # save what was read, with boxes, for checking or sending in
+                marked = r.image.copy()
+                for rect in r.raw.boxes.values():
                     draw_box(marked, rect, (50, 182, 242))
-                p = DebugDumper(cfg).save(marked, f"read_{raw.kind}")
+                dump = DebugDumper(cfg)
+                dump.save(r.image, f"read_{r.raw.kind}_clean")    # boxes would hide the anchor
+                p = dump.save(marked, f"read_{r.raw.kind}")
                 self.log.system(f"Picture of the boxes that were read: {p}")
         except Exception as exc:  # show any failure in the log, never crash the GUI
             self.log.error(f"Read screen failed: {exc}")
-        finally:
-            if cap is not None:
-                cap.close()
         self.root.after(0, lambda: self.btn_read.configure(state="normal", text=READ_LABEL))
+
+    # ------------------------------------------------------------ watch (follow a run you play by hand)
+    def _toggle_watch(self) -> None:
+        if self._watch_token is not None:
+            self._watch_token.stop("watch stopped")
+            self.btn_watch.configure(state="disabled", text="👁 stopping…")
+            return
+        self._watch_token = CancelToken()
+        for b in (self.btn_read, self.btn_shot):
+            b.configure(state="disabled")
+        self.btn_watch.configure(text="👁 Stop watching")
+        self.log.action("Watching the screen: play normally, the agent follows the run (it presses nothing)")
+        threading.Thread(target=self._watch_loop, args=(self._watch_token,), daemon=True).start()
+
+    def _watch_loop(self, token: CancelToken) -> None:
+        cfg = self.cfg_mgr.config
+        try:
+            from ..core.errors import AutomationCancelled
+            from ..core.timing import interruptible_sleep
+            from ..game.perceive import Perceiver
+            from ..game.state import RunState
+            if self.rules is None:
+                raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
+            with Perceiver(cfg, self.rules) as eyes:   # created and closed in this thread
+                run = RunState(cfg.detection)
+                self.status.publish(status="WATCHING")
+                try:
+                    while True:
+                        token.check()
+                        for event in run.observe(eyes.read_state()):
+                            self.log.state(event)
+                        gs = run.snapshot()
+                        t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
+                        self.status.publish(
+                            rbc_round=gs.round_no, detection_confidence=gs.confidence,
+                            objective="; ".join(o.text for o in gs.objectives),
+                            action=f"{gs.screen.replace('_', ' ')} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
+                        interruptible_sleep(1.0 / cfg.scan_rates.ocr_hz, token=token)
+                except AutomationCancelled:
+                    pass
+        except Exception as exc:  # show any failure in the log, never crash the GUI
+            self.log.error(f"Watch failed: {exc}")
+        finally:
+            self.status.publish(status="IDLE", action="")
+            self._watch_done.set()          # _tick (GUI thread) resets the buttons; no Tk calls from here
+
+    def _watch_stopped(self) -> None:
+        self._watch_token = None
+        self.btn_watch.configure(state="normal", text=WATCH_LABEL)
+        for b in (self.btn_read, self.btn_shot):
+            b.configure(state="normal")
+        self.log.action("Stopped watching")
 
     def _shot_worker(self) -> None:
         cfg = self.cfg_mgr.config
@@ -917,6 +967,9 @@ class ControlPanel:
             st = snap.status
             col = {"IDLE": MUTED, "RUNNING": OK, "PAUSED": WARN, "STOPPED": BAD}.get(st, ACCENT)
             self.pill.configure(text=f" {st} ", fg=col)
+        if self._watch_done.is_set():
+            self._watch_done.clear()
+            self._watch_stopped()
         self._drain_log()
         self.root.after(100, self._tick)
 
@@ -1065,6 +1118,8 @@ class ControlPanel:
         if self.dirty and not messagebox.askyesno("Unsaved settings", "You have unsaved settings. Quit anyway?"):
             return
         # Stage 6+: stop automation thread and release all keys here first.
+        if self._watch_token is not None:
+            self._watch_token.stop("window closed")
         self.root.destroy()
 
 

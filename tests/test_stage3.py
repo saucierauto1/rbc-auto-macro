@@ -76,6 +76,7 @@ def test_shop_rows_with_mangled_level_text():
     assert RULES.upgrade_by_name("Overfit: Bled") is None
     assert RULES.upgrade_by_name("0verfit: Blue").id == "overfit_blue"
     assert parse_shop_row("ns", "nn", RULES) is None
+    assert parse_shop_row("[Crypto] Cost: 9 Cogs", "+3 Cogs Per Round, x0.8 Capacity |", RULES).effects ==         "+3 Cogs Per Round, x0.8 Capacity"
 
 
 def test_bee_list_variable_length():
@@ -207,3 +208,31 @@ def test_preflight_reports_tesseract():
     assert "Calibration" not in checks
     with pytest.raises(ConfigError):
         parse_config({"ocr": {"upscale": 9}})
+
+
+# ------------------------------------------------------------------ live 1920x1009 window (title bar visible)
+@needs_tesseract
+def test_ocr_real_window_1009(read):
+    q = read("quest_choice_1009")
+    assert (q.kind, q.round_no, q.cogs, q.free_rerolls) == ("quest_choice", 3, 34, 1)
+    assert [(q2.reward, [(o.type, o.amount, o.color) for o in q2.objectives]) for q2 in q.quests] == [
+        (11, [("collect_color_pollen", 187500, "red")]), (11, [("collect_pollen", 225000, "")])]
+    b = read("bee_pick_1009")
+    assert (b.round_no, b.cogs, b.reroll_cost) == (3, 34, 5)
+    assert [(x.name, x.level, x.mutation) for x in b.bees] == [
+        ("Spicy", 21, "+3% Ability Rate"), ("Spicy", 21, "+3% Ability Rate"), ("Precise", 22, "+5 Movespeed")]
+    s = read("upgrade_shop_1009")
+    assert [(o.upgrade_id, o.price) for o in s.shop] == [("overfit_blue", 8), ("credit", 7), ("crypto", 9)]
+    assert s.reroll_cost == 5
+
+
+def test_shop_skips_other_colour_for_mono_hive():
+    from rbc_agent.core.config import UpgradeConfig
+    from rbc_agent.decision.picks import ShopItem, plan_shop
+    red = HiveProfile.from_config(parse_config({"hive": {"color_override": "red"}}).hive, CAT)
+    items = [ShopItem("overfit_blue", 8), ShopItem("credit", 7), ShopItem("crypto", 9)]
+    w = CFG.strategy.active_weights()
+    assert "overfit_blue" not in plan_shop(items, 34, RULES.upgrades, UpgradeConfig(), w, red).buy
+    # Off with the setting, or when the user put it on the priority list.
+    assert "overfit_blue" in plan_shop(items, 34, RULES.upgrades, UpgradeConfig(skip_off_color=False), w, red).buy
+    assert "overfit_blue" in plan_shop(items, 34, RULES.upgrades, UpgradeConfig(priority=["overfit_blue"]), w, red).buy
