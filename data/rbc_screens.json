@@ -1,0 +1,49 @@
+{
+  "_about": "Where text sits on the RBC screens. Boxes are pixels on a 1920x1080 screenshot. At run time each group is found by its green title bar ('anchor') and its boxes move and scale with that bar, so any window size works. Box = [left, top, right, bottom, mode, psm]; mode 'yellow' keeps only yellow text; psm 7 = one line, 6 = a block of lines. Measured from real screenshots (tests/fixtures/screens).",
+  "dialog": {
+    "_what": "Between-round window: quest choice, bee pick, upgrade shop",
+    "anchor": [692, 277, 1220, 343],
+    "search": [0.2, 0.1, 0.6, 0.45],
+    "aspect": [6.0, 9.0],
+    "scale_by": "width",
+    "boxes": {
+      "title": [700, 283, 1215, 345, "gray", 7],
+      "subtitle": [712, 348, 1200, 384, "gray", 7],
+      "cogs": [555, 735, 710, 785, "gray", 7],
+      "reroll": [738, 736, 942, 778, "gray", 7]
+    },
+    "quest_choice": {
+      "card_a": [722, 425, 946, 665, "gray", 6],
+      "card_b": [966, 425, 1190, 665, "gray", 6],
+      "reward_a": [726, 670, 946, 714, "yellow", 7],
+      "reward_b": [970, 670, 1190, 714, "yellow", 7]
+    },
+    "bee_pick": {
+      "list": [805, 384, 1192, 718, "gray", 6]
+    },
+    "upgrade_shop": {
+      "_rows": "row n is these boxes moved down by n * pitch",
+      "pitch": 85,
+      "max_rows": 4,
+      "header": [714, 386, 1165, 412, "gray", 7],
+      "effects": [750, 420, 1157, 455, "gray", 7]
+    }
+  },
+  "hud": {
+    "_what": "Round panel on the right during a round",
+    "anchor": [1700, 430, 1914, 470],
+    "search": [0.7, 0.2, 0.3, 0.5],
+    "aspect": [4.0, 7.0],
+    "scale_by": "height",
+    "boxes": {
+      "round_time": [1702, 472, 1913, 497, "gray", 7],
+      "quest": [1704, 498, 1913, 588, "gray", 6],
+      "cogs": [1702, 590, 1820, 614, "gray", 7]
+    }
+  },
+  "subtitles": {
+    "quest_choice": ["quest"],
+    "bee_pick": ["bee"],
+    "upgrade_shop": ["upgrade", "purchase"]
+  }
+}

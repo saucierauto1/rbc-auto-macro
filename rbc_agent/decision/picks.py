@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from ..core.config import BeePickConfig, QuestConfig, StrategyWeights, UpgradeConfig
 from ..game.hive import BeeInfo, HiveProfile, normalize_bee
 from ..game.rules import UpgradeDef
+from ..game.screens import QuestOffer
 
 RARITY_SCORE = {"common": 0, "rare": 1, "epic": 2, "legendary": 3, "mythic": 4, "event": 4}
 
@@ -69,6 +70,18 @@ class QuestCard:
     amount: float = 0.0          # pollen / mobs requested (bigger = harder)
     color: str = ""              # for collect_color_pollen
     field: str = ""              # for collect_field_pollen
+    # A real card has several objectives: types of all of them, and its Cog reward.
+    parts: tuple[str, ...] = ()
+    reward: int | None = None
+
+    @classmethod
+    def from_offer(cls, offer: QuestOffer) -> "QuestCard":
+        objs = offer.objectives
+        first = next((o for o in objs if o.color or o.place), objs[0] if objs else None)
+        return cls(first.type if first else "unknown",
+                   sum(o.amount or 0 for o in objs),
+                   color=first.color if first else "", field=first.place if first else "",
+                   parts=tuple(o.type for o in objs), reward=offer.reward)
 
 
 @dataclass(frozen=True)
@@ -82,15 +95,20 @@ def pick_quest(cards: list[QuestCard], cfg: QuestConfig, hive: HiveProfile,
                field_colors: dict[str, str], *, free_reroll_left: bool) -> QuestPickResult:
     if not cards:
         return QuestPickResult(-1, False, "no quest cards")
-    if free_reroll_left and cfg.free_reroll_if_both and all(c.type in cfg.free_reroll_if_both for c in cards):
+    unwanted = lambda c: any(t in cfg.free_reroll_if_both for t in (c.parts or (c.type,)))  # noqa: E731
+    if free_reroll_left and cfg.free_reroll_if_both and all(unwanted(c) for c in cards):
         return QuestPickResult(-1, True, "both quests unwanted, using free reroll")
+
+    def rank_of(t: str) -> int:
+        return cfg.priority.index(t) if t in cfg.priority else len(cfg.priority)
 
     def key(ic: tuple[int, QuestCard]):
         i, c = ic
-        rank = cfg.priority.index(c.type) if c.type in cfg.priority else len(cfg.priority)
+        rank = max(rank_of(t) for t in (c.parts or (c.type,)))     # a card is as bad as its worst part
         color = c.color or field_colors.get(c.field, "")
         matches = int(hive.color != "mixed" and color == hive.color)
-        harder = c.amount if cfg.prefer_harder_for_cogs else -c.amount
+        size = c.reward if c.reward is not None else c.amount
+        harder = size if cfg.prefer_harder_for_cogs else -size
         return (rank, -matches, -harder, i)
 
     i, best = min(enumerate(cards), key=key)

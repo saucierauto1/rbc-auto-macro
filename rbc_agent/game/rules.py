@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import difflib
 import json
+import re
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -85,12 +87,22 @@ class RBCRules:
         return out
 
     def upgrade_by_name(self, ocr_name: str) -> UpgradeDef | None:
-        """Look up an upgrade from OCR text (case/spacing tolerant)."""
-        key = "".join(ch for ch in ocr_name.lower() if ch.isalnum())
-        for u in self.upgrades.values():
-            if "".join(ch for ch in u.name.lower() if ch.isalnum()) == key:
-                return u
-        return None
+        """Look up an upgrade from OCR text (case/spacing tolerant, allows a misread letter)."""
+        squash = lambda s: "".join(ch for ch in s.lower() if ch.isalnum())  # noqa: E731
+        by_key = {squash(u.name): u for u in self.upgrades.values()}
+        key = squash(ocr_name)
+        if key in by_key:
+            return by_key[key]
+        # Fuzzy match only when one name is clearly closest: "Overfit: Red" and
+        # "Overfit: Blue" are similar, and buying the wrong colour is worse than skipping.
+        scored = sorted((difflib.SequenceMatcher(None, key, k).ratio(), k) for k in by_key)
+        best, second = scored[-1], scored[-2] if len(scored) > 1 else (0.0, "")
+        return by_key[best[1]] if best[0] >= 0.8 and best[0] - second[0] >= 0.08 else None
+
+    @cached_property
+    def objective_patterns(self) -> list[tuple[str, re.Pattern]]:
+        """(quest type, compiled regex) pairs used to read quest text."""
+        return [(p["id"], re.compile(p["regex"])) for p in self.raw["objective_patterns"] if "id" in p]
 
     def rarity_weight(self, rarity: str, round_no: int) -> float:
         lo, hi = self.raw["upgrade_rarity_weights"][rarity]
