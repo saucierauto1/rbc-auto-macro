@@ -746,7 +746,7 @@ class ControlPanel:
         self._num(("combat", "approach_min_dist"), "Close enough to a mob", sec, 2, 0.5, 10, 0.5, True)
         self._num(("combat", "approach_range"), "Max distance to walk to a mob", sec, 3, 1, 30, 0.5, True)
 
-        mobs = (self.rules.raw.get("mobs", {}) if self.rules else {})
+        mobs = self.rules.mobs if self.rules else {}
         if mobs:
             sec = self._section(body, "Mob guide")
             for i, (name, m) in enumerate(mobs.items()):
@@ -782,38 +782,26 @@ class ControlPanel:
 
     def _read_worker(self) -> None:
         cfg = self.cfg_mgr.config
-        cap = None
         try:
-            from ..game.screens import parse_screen
-            from ..perception.capture import ScreenCapture
+            from ..game.perceive import Perceiver
             from ..perception.debug_dump import DebugDumper, draw_box
-            from ..perception.ocr import Tesseract
-            from ..perception.screen_reader import ScreenReader
             from .screen_report import describe
             if self.rules is None:
                 raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
-            reader = ScreenReader(Tesseract(cfg.ocr), cfg.ocr)
-            cap = ScreenCapture(cfg)
-            cap.locate(force=True)
-            frame = cap.grab_client(fresh=True)
-            raw = reader.read(frame.image)
-            catalog = load_catalog()
-            st = parse_screen(raw.kind, raw.texts, raw.shop_rows, self.rules, catalog)
-            for line in describe(st, cfg, self.rules, catalog):
+            with Perceiver(cfg, self.rules) as eyes:   # closes the screen capture even on errors
+                r = eyes.read()
+            for line in describe(r.state, cfg, self.rules, eyes.catalog):
                 self.log.detect(line)
-            if raw.boxes:      # save what was read, with boxes, for checking or sending in
-                marked = frame.image.copy()
-                for rect in raw.boxes.values():
+            if r.raw.boxes:    # save what was read, with boxes, for checking or sending in
+                marked = r.image.copy()
+                for rect in r.raw.boxes.values():
                     draw_box(marked, rect, (50, 182, 242))
                 dump = DebugDumper(cfg)
-                dump.save(frame.image, f"read_{raw.kind}_clean")    # boxes would hide the anchor
-                p = dump.save(marked, f"read_{raw.kind}")
+                dump.save(r.image, f"read_{r.raw.kind}_clean")    # boxes would hide the anchor
+                p = dump.save(marked, f"read_{r.raw.kind}")
                 self.log.system(f"Picture of the boxes that were read: {p}")
         except Exception as exc:  # show any failure in the log, never crash the GUI
             self.log.error(f"Read screen failed: {exc}")
-        finally:
-            if cap is not None:
-                cap.close()
         self.root.after(0, lambda: self.btn_read.configure(state="normal", text=READ_LABEL))
 
     # ------------------------------------------------------------ watch (follow a run you play by hand)
@@ -831,46 +819,33 @@ class ControlPanel:
 
     def _watch_loop(self, token: CancelToken) -> None:
         cfg = self.cfg_mgr.config
-        cap = None
         try:
-            from ..core.errors import AutomationCancelled, WindowLostError
+            from ..core.errors import AutomationCancelled
             from ..core.timing import interruptible_sleep
-            from ..game.screens import ScreenState, parse_screen
+            from ..game.perceive import Perceiver
             from ..game.state import RunState
-            from ..perception.capture import ScreenCapture
-            from ..perception.ocr import Tesseract
-            from ..perception.screen_reader import ScreenReader
             if self.rules is None:
                 raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
-            reader = ScreenReader(Tesseract(cfg.ocr), cfg.ocr)
-            catalog = load_catalog()
-            cap = ScreenCapture(cfg)       # created in this thread: mss handles belong to it
-            run = RunState(cfg.detection)
-            self.status.publish(status="WATCHING")
-            try:
-                while True:
-                    token.check()
-                    try:
-                        raw = reader.read(cap.grab_client(fresh=True).image)
-                        st = parse_screen(raw.kind, raw.texts, raw.shop_rows, self.rules, catalog)
-                    except WindowLostError:
-                        st = ScreenState("unknown")
-                    for event in run.observe(st):
-                        self.log.state(event)
-                    gs = run.snapshot()
-                    t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
-                    self.status.publish(
-                        rbc_round=gs.round_no, detection_confidence=gs.confidence,
-                        objective="; ".join(o.text for o in gs.objectives),
-                        action=f"{gs.screen.replace('_', ' ')} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
-                    interruptible_sleep(1.0 / cfg.scan_rates.ocr_hz, token=token)
-            except AutomationCancelled:
-                pass
+            with Perceiver(cfg, self.rules) as eyes:   # created and closed in this thread
+                run = RunState(cfg.detection)
+                self.status.publish(status="WATCHING")
+                try:
+                    while True:
+                        token.check()
+                        for event in run.observe(eyes.read_state()):
+                            self.log.state(event)
+                        gs = run.snapshot()
+                        t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
+                        self.status.publish(
+                            rbc_round=gs.round_no, detection_confidence=gs.confidence,
+                            objective="; ".join(o.text for o in gs.objectives),
+                            action=f"{gs.screen.replace('_', ' ')} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
+                        interruptible_sleep(1.0 / cfg.scan_rates.ocr_hz, token=token)
+                except AutomationCancelled:
+                    pass
         except Exception as exc:  # show any failure in the log, never crash the GUI
             self.log.error(f"Watch failed: {exc}")
         finally:
-            if cap is not None:
-                cap.close()
             self.status.publish(status="IDLE", action="")
             self._watch_done.set()          # _tick (GUI thread) resets the buttons; no Tk calls from here
 

@@ -83,7 +83,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (102 tests)
+python -m pytest -q                    # run the test suite (105 tests)
 ```
 
 ## Configuring

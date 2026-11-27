@@ -46,6 +46,9 @@ architecture notes, implementation, how to run, how to test, and known limitatio
 - **Decided (user):** hive colour and the Digital Bee drive rule use the **whole hive** from the
   Hive tab (`HiveProfile.from_config`), not the RBC team picked during the run. `GameState.team`
   is only a record of picks.
+- **`game/perceive.py` `Perceiver`:** the one capture -> ScreenReader -> parse_screen chain (Read
+  screen, Watch, and Stage 5 use it). Create and close it in the thread that uses it (`with`).
+  `RBCRules.mobs` is the typed access to mob facts; nothing outside rules.py reads `.raw`.
 - **Next: Stage 5** (state machine).
 
 ## Game facts (see data/rbc_rules.json)

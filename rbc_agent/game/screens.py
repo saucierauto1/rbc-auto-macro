@@ -127,7 +127,7 @@ def parse_shop_row(header: str, effects: str, rules: RBCRules) -> ShopOffer | No
     u = rules.upgrade_by_name(name)
     lvl = re.search(r"\bl\s*v\s*[lt1i]?\W*(\d+)", header, re.IGNORECASE)
     return ShopOffer(u.name if u else name, u.id if u else None, _int_after(r"cost", header),
-                     int(lvl.group(1)) if lvl else None, effects.strip())
+                     int(lvl.group(1)) if lvl else None, effects.strip().rstrip("|_ "))
 
 
 _BEE_LINE = re.compile(r"([a-z][a-z .'\-]*?bee)\s*\(\s*l\s*v\s*[l1i]?\W*(\d+)", re.IGNORECASE)

@@ -76,6 +76,7 @@ def test_shop_rows_with_mangled_level_text():
     assert RULES.upgrade_by_name("Overfit: Bled") is None
     assert RULES.upgrade_by_name("0verfit: Blue").id == "overfit_blue"
     assert parse_shop_row("ns", "nn", RULES) is None
+    assert parse_shop_row("[Crypto] Cost: 9 Cogs", "+3 Cogs Per Round, x0.8 Capacity |", RULES).effects ==         "+3 Cogs Per Round, x0.8 Capacity"
 
 
 def test_bee_list_variable_length():
