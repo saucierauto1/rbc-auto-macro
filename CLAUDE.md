@@ -43,8 +43,9 @@ architecture notes, implementation, how to run, how to test, and known limitatio
   run: mutation parsing by "+N", `upgrades.skip_off_color`, Read screen saves a `_clean` copy,
   live 1920x1009 fixtures. A dialog read takes 1-1.7 s, so confirmation costs ~5 s: Stage 5 should
   act on single reads where safe and confirm only before spending Cogs.
-- **Open question:** does RBC hive colour / Digital Bee mean the whole hive (Hive tab) or the RBC
-  team picked during the run ("Active Bees (N)")? Ask the user before wiring decisions to GameState.
+- **Decided (user):** hive colour and the Digital Bee drive rule use the **whole hive** from the
+  Hive tab (`HiveProfile.from_config`), not the RBC team picked during the run. `GameState.team`
+  is only a record of picks.
 - **Next: Stage 5** (state machine).
 
 ## Game facts (see data/rbc_rules.json)
