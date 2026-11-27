@@ -69,6 +69,7 @@
     "ocr_min_confidence": 0.6,
     "transition_threshold": 0.75,
     "confirm_frames": 3,
+    "jump_accept_reads": 8,
     "unknown_state_threshold": 0.4,
     "unknown_state_grace_s": 4.0,
     "confidence_weights": {
@@ -442,6 +443,7 @@
     "blacklist": [],
     "auto_buy": true,
     "lock_unaffordable_priority": true,
+    "skip_off_color": true,
     "min_cog_reserve": 0,
     "max_rerolls_per_round": 0,
     "rarity_bias": {

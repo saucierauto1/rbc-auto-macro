@@ -23,6 +23,7 @@ from .. import __version__
 from ..core.config import (DRIVE_TYPES, HOTBAR_WHEN, QUEST_TYPES, AppConfig, BeeEntry, ConfigManager,
                            DriveConfig, HiveConfig, parse_config, to_dict)
 from ..core.errors import ConfigError
+from ..core.timing import CancelToken
 from ..core.logger import Category, LogEvent, setup_logging
 from ..core.paths import DATA_DIR, LOGS_DIR, USER_CONFIG_FILE
 from ..core.preflight import can_start, run_preflight
@@ -49,6 +50,7 @@ QUEST_LABELS = {
 }
 SHOT_LABEL = "📸 Screenshot"
 READ_LABEL = "🔍 Read screen"
+WATCH_LABEL = "👁 Watch"
 DRIVE_LABELS = {"red": "Red Drive", "blue": "Blue Drive", "white": "White Drive", "glitched": "Glitched Drive"}
 HOTKEYS = [f"F{i}" for i in range(1, 13)] + ["PAUSE", "SCROLL_LOCK", "INSERT", "HOME", "END"]
 RARITY_TAG = {"common": "C", "rare": "R", "epic": "E", "legendary": "L", "mythic": "M", "event": "Ev"}
@@ -257,7 +259,11 @@ class ControlPanel:
         self.btn_reload = ttk.Button(bar, text="⟳ Reload config", command=self._reload_config)
         self.btn_read = ttk.Button(bar, text=READ_LABEL, command=self._read_screen)
         self.btn_shot = ttk.Button(bar, text=SHOT_LABEL, command=self._screenshot)
-        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_read, self.btn_reload):
+        self.btn_watch = ttk.Button(bar, text=WATCH_LABEL, command=self._toggle_watch)
+        self._watch_token: CancelToken | None = None
+        self._watch_done = threading.Event()
+        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_read, self.btn_watch,
+                  self.btn_reload):
             b.pack(side="left", padx=(0, 6))
         self.debug_var = tk.BooleanVar(value=self.cfg_mgr.config.debug.enabled)
         ttk.Checkbutton(bar, text="Debug mode", variable=self.debug_var,
@@ -810,6 +816,71 @@ class ControlPanel:
                 cap.close()
         self.root.after(0, lambda: self.btn_read.configure(state="normal", text=READ_LABEL))
 
+    # ------------------------------------------------------------ watch (follow a run you play by hand)
+    def _toggle_watch(self) -> None:
+        if self._watch_token is not None:
+            self._watch_token.stop("watch stopped")
+            self.btn_watch.configure(state="disabled", text="👁 stopping…")
+            return
+        self._watch_token = CancelToken()
+        for b in (self.btn_read, self.btn_shot):
+            b.configure(state="disabled")
+        self.btn_watch.configure(text="👁 Stop watching")
+        self.log.action("Watching the screen: play normally, the agent follows the run (it presses nothing)")
+        threading.Thread(target=self._watch_loop, args=(self._watch_token,), daemon=True).start()
+
+    def _watch_loop(self, token: CancelToken) -> None:
+        cfg = self.cfg_mgr.config
+        cap = None
+        try:
+            from ..core.errors import AutomationCancelled, WindowLostError
+            from ..core.timing import interruptible_sleep
+            from ..game.screens import ScreenState, parse_screen
+            from ..game.state import RunState
+            from ..perception.capture import ScreenCapture
+            from ..perception.ocr import Tesseract
+            from ..perception.screen_reader import ScreenReader
+            if self.rules is None:
+                raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
+            reader = ScreenReader(Tesseract(cfg.ocr), cfg.ocr)
+            catalog = load_catalog()
+            cap = ScreenCapture(cfg)       # created in this thread: mss handles belong to it
+            run = RunState(cfg.detection)
+            self.status.publish(status="WATCHING")
+            try:
+                while True:
+                    token.check()
+                    try:
+                        raw = reader.read(cap.grab_client(fresh=True).image)
+                        st = parse_screen(raw.kind, raw.texts, raw.shop_rows, self.rules, catalog)
+                    except WindowLostError:
+                        st = ScreenState("unknown")
+                    for event in run.observe(st):
+                        self.log.state(event)
+                    gs = run.snapshot()
+                    t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
+                    self.status.publish(
+                        rbc_round=gs.round_no, detection_confidence=gs.confidence,
+                        objective="; ".join(o.text for o in gs.objectives),
+                        action=f"{gs.screen.replace('_', ' ')} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
+                    interruptible_sleep(1.0 / cfg.scan_rates.ocr_hz, token=token)
+            except AutomationCancelled:
+                pass
+        except Exception as exc:  # show any failure in the log, never crash the GUI
+            self.log.error(f"Watch failed: {exc}")
+        finally:
+            if cap is not None:
+                cap.close()
+            self.status.publish(status="IDLE", action="")
+            self._watch_done.set()          # _tick (GUI thread) resets the buttons; no Tk calls from here
+
+    def _watch_stopped(self) -> None:
+        self._watch_token = None
+        self.btn_watch.configure(state="normal", text=WATCH_LABEL)
+        for b in (self.btn_read, self.btn_shot):
+            b.configure(state="normal")
+        self.log.action("Stopped watching")
+
     def _shot_worker(self) -> None:
         cfg = self.cfg_mgr.config
         folder = None
@@ -921,6 +992,9 @@ class ControlPanel:
             st = snap.status
             col = {"IDLE": MUTED, "RUNNING": OK, "PAUSED": WARN, "STOPPED": BAD}.get(st, ACCENT)
             self.pill.configure(text=f" {st} ", fg=col)
+        if self._watch_done.is_set():
+            self._watch_done.clear()
+            self._watch_stopped()
         self._drain_log()
         self.root.after(100, self._tick)
 
@@ -1069,6 +1143,8 @@ class ControlPanel:
         if self.dirty and not messagebox.askyesno("Unsaved settings", "You have unsaved settings. Quit anyway?"):
             return
         # Stage 6+: stop automation thread and release all keys here first.
+        if self._watch_token is not None:
+            self._watch_token.stop("window closed")
         self.root.destroy()
 
 

@@ -35,7 +35,17 @@ architecture notes, implementation, how to run, how to test, and known limitatio
   release zip bundles it (`tools/bundle_tesseract.sh`). Template matching moved to Stage 10,
   scheduler to Stage 5 (nothing to schedule yet). Only seen at 1920x1080: other window sizes are
   tested by shrinking the screenshots, not on a real smaller window.
-- **Next: Stage 4** (game-state models), then the Stage 5 state machine.
+- **Stage 4 done (0.5.0):** `game/state.py` `RunState.observe(ScreenState)` confirms reads over
+  `detection.confirm_frames` (key = kind, round, Cogs on dialogs), round only same/+1 (jump believed
+  after `detection.jump_accept_reads`; round 1 on quest screen = new run), unknown gaps shorter than
+  `unknown_state_grace_s` keep state; `snapshot()` -> frozen `GameState`. Dashboard 👁 Watch runs
+  read -> observe in a thread (CancelToken, no Tk calls from the thread). Also from the first live
+  run: mutation parsing by "+N", `upgrades.skip_off_color`, Read screen saves a `_clean` copy,
+  live 1920x1009 fixtures. A dialog read takes 1-1.7 s, so confirmation costs ~5 s: Stage 5 should
+  act on single reads where safe and confirm only before spending Cogs.
+- **Open question:** does RBC hive colour / Digital Bee mean the whole hive (Hive tab) or the RBC
+  team picked during the run ("Active Bees (N)")? Ask the user before wiring decisions to GameState.
+- **Next: Stage 5** (state machine).
 
 ## Game facts (see data/rbc_rules.json)
 25 rounds, 300 s each, bonus Cogs under 3:45 (225 s). Each round: quest choice (1 of 2,
