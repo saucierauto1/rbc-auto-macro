@@ -130,6 +130,11 @@ class ShopPlan:
     reason: str
 
 
+def off_color(u: UpgradeDef, hive: HiveProfile) -> bool:
+    """A red upgrade for a blue hive, or a blue one for a red hive."""
+    return {u.color, hive.color} == {"red", "blue"}
+
+
 def score_upgrade(u: UpgradeDef, cfg: UpgradeConfig, weights: StrategyWeights, hive: HiveProfile) -> float:
     s = cfg.base_score * cfg.rarity_bias.get(u.rarity, 1.0)
     for t in u.tags:
@@ -138,8 +143,8 @@ def score_upgrade(u: UpgradeDef, cfg: UpgradeConfig, weights: StrategyWeights, h
         s *= weights.color_bias.get(u.color, 1.0)
         if u.color == hive.color:
             s *= cfg.hive_color_mult
-        elif hive.color in ("red", "blue") and u.color in ("red", "blue"):
-            s *= cfg.off_color_mult   # off-colour upgrade for a mono hive
+        elif off_color(u, hive):
+            s *= cfg.off_color_mult
     if u.id in cfg.priority:
         s += cfg.priority_bonus - cfg.priority_step * cfg.priority.index(u.id)
     return s
@@ -150,7 +155,9 @@ def plan_shop(items: list[ShopItem], cogs: int | None, upgrades: dict[str, Upgra
     if not cfg.auto_buy:
         return ShopPlan([], [], "auto-buy is off")
     cands = [(score_upgrade(upgrades[it.upgrade_id], cfg, weights, hive), it)
-             for it in items if it.upgrade_id in upgrades and it.upgrade_id not in cfg.blacklist]
+             for it in items if it.upgrade_id in upgrades and it.upgrade_id not in cfg.blacklist
+             and not (cfg.skip_off_color and it.upgrade_id not in cfg.priority
+                      and off_color(upgrades[it.upgrade_id], hive))]
     cands.sort(key=lambda t: -t[0])
     budget = cogs
     buy, lock = [], []

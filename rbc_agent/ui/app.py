@@ -540,10 +540,12 @@ class ControlPanel:
         sec = self._section(body, "Shop behaviour")
         self._bvar(("upgrades", "auto_buy"), "Auto-buy upgrades", sec, 0)
         self._bvar(("upgrades", "lock_unaffordable_priority"), "LOCK priority upgrades I can't afford yet", sec, 1)
-        self._num(("upgrades", "min_cog_reserve"), "Keep at least this many Cogs", sec, 2, 0, 9999)
-        self._num(("upgrades", "max_rerolls_per_round"), "Max shop rerolls per round", sec, 3, 0, 20)
+        self._bvar(("upgrades", "skip_off_color"),
+                   "Never buy the other colour (no blue upgrades for a red hive, and the reverse)", sec, 2)
+        self._num(("upgrades", "min_cog_reserve"), "Keep at least this many Cogs", sec, 3, 0, 9999)
+        self._num(("upgrades", "max_rerolls_per_round"), "Max shop rerolls per round", sec, 4, 0, 20)
         rb = ttk.Frame(sec)
-        rb.grid(row=4, column=0, columnspan=4, sticky="w", pady=(8, 0))
+        rb.grid(row=5, column=0, columnspan=4, sticky="w", pady=(8, 0))
         ttk.Label(rb, text="Rarity multipliers:").grid(row=0, column=0, sticky="w", padx=(0, 10))
         for i, r in enumerate(("common", "rare", "epic", "legendary")):
             self._num(("upgrades", "rarity_bias", r), r.title(), rb, 0, 0, 5, 0.05, True, col=1 + i * 2, width=5)
@@ -797,7 +799,9 @@ class ControlPanel:
                 marked = frame.image.copy()
                 for rect in raw.boxes.values():
                     draw_box(marked, rect, (50, 182, 242))
-                p = DebugDumper(cfg).save(marked, f"read_{raw.kind}")
+                dump = DebugDumper(cfg)
+                dump.save(frame.image, f"read_{raw.kind}_clean")    # boxes would hide the anchor
+                p = dump.save(marked, f"read_{raw.kind}")
                 self.log.system(f"Picture of the boxes that were read: {p}")
         except Exception as exc:  # show any failure in the log, never crash the GUI
             self.log.error(f"Read screen failed: {exc}")

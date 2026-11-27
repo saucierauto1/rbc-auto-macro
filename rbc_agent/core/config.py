@@ -493,6 +493,9 @@ class UpgradeConfig:
     blacklist: list[str] = field(default_factory=list)
     auto_buy: bool = True
     lock_unaffordable_priority: bool = True
+    # Never buy a blue upgrade for a red hive or a red one for a blue hive
+    # (unless it is on your priority list). They usually make your hive worse.
+    skip_off_color: bool = True
     # Always keep at least this many Cogs after a purchase.
     min_cog_reserve: int = 0
     max_rerolls_per_round: int = 0

@@ -139,9 +139,14 @@ def parse_bee_list(text: str, catalog: dict[str, BeeInfo]) -> list[BeeOffer]:
     lines = text.splitlines()
     starts = [(i, m) for i, ln in enumerate(lines) if (m := _BEE_LINE.search(ln))]
     for k, (i, m) in enumerate(starts):
-        rest = " ".join(lines[i + 1: starts[k + 1][0] if k + 1 < len(starts) else len(lines)])
-        mut = re.search(r"mutation\s*[:;]?\s*([+\-]?\d+%?\s*[a-z][a-z ]*|[a-z][a-z ]*)", rest, re.IGNORECASE)
-        mutation = mut.group(1).strip() if mut else ""
+        rest = "\n".join(lines[i + 1: starts[k + 1][0] if k + 1 < len(starts) else len(lines)])
+        # A mutation is "+N Stat" or "+N% Stat". Look for the signed number itself, because
+        # the word "Mutation:" is sometimes misread; the stat may wrap onto the next line.
+        mut = re.search(r"([+\-]\d+%?)[ \t]*([^\n]*)(?:\n([^\n]*))?", rest)
+        mutation = ""
+        if mut:
+            stat = mut.group(2) if re.search(r"[a-z]{3}", mut.group(2), re.I) else (mut.group(3) or "")
+            mutation = " ".join([mut.group(1)] + re.findall(r"[A-Za-z]{2,}", stat))
         # The gifted star is read as a stray letter ("X Ninja Bee"); no bee name is one letter.
         raw = re.sub(r"^(?:\S\s+)+", "", m.group(1).strip())
         info = catalog.get(normalize_bee(raw))
