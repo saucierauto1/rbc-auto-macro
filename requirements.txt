@@ -2,10 +2,12 @@
 pytest>=7
 
 # Stage 2: screen capture
-mss>=9
+mss>=10,<11
 numpy>=1.26
 
+# Stage 3: OCR. Also needs the Tesseract program: the release zip bundles it,
+# or install it from https://github.com/UB-Mannheim/tesseract/wiki
+pillow>=10
+
 # Later stages (not needed yet):
-# opencv-python>=4.9   (Stage 3 template matching)
 # pynput>=1.7          (Stage 6 global hotkeys)
-# pytesseract>=0.3     (Stage 3 OCR, plus the Tesseract binary) or easyocr>=1.7

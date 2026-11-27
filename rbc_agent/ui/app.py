@@ -42,10 +42,13 @@ CAT_COLORS = {
 LOG_LINES_MAX = 2000
 QUEST_LABELS = {
     "collect_color_pollen": "Collect colour pollen (red/blue/white)",
+    "collect_pollen": "Collect pollen (any field)",
     "collect_field_pollen": "Collect pollen from a field",
     "defeat_mobs": "Defeat mobs (Mechsquitos, Cogmowers…)",
-    "convert_pollen": "Convert pollen at the hive",
+    "convert_pollen": "Make honey / convert pollen at the hive",
 }
+SHOT_LABEL = "📸 Screenshot"
+READ_LABEL = "🔍 Read screen"
 DRIVE_LABELS = {"red": "Red Drive", "blue": "Blue Drive", "white": "White Drive", "glitched": "Glitched Drive"}
 HOTKEYS = [f"F{i}" for i in range(1, 13)] + ["PAUSE", "SCROLL_LOCK", "INSERT", "HOME", "END"]
 RARITY_TAG = {"common": "C", "rare": "R", "epic": "E", "legendary": "L", "mythic": "M", "event": "Ev"}
@@ -252,9 +255,9 @@ class ControlPanel:
         self.btn_stop = ttk.Button(bar, text=f"■ STOP ({hk.emergency_stop})", style="Danger.TButton",
                                    state="disabled")
         self.btn_reload = ttk.Button(bar, text="⟳ Reload config", command=self._reload_config)
-        self.btn_calib = ttk.Button(bar, text="⌖ Calibrate (Stage 3)", state="disabled")
-        self.btn_shot = ttk.Button(bar, text="📸 Screenshot", command=self._screenshot)
-        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_reload, self.btn_calib):
+        self.btn_read = ttk.Button(bar, text=READ_LABEL, command=self._read_screen)
+        self.btn_shot = ttk.Button(bar, text=SHOT_LABEL, command=self._screenshot)
+        for b in (self.btn_start, self.btn_pause, self.btn_stop, self.btn_shot, self.btn_read, self.btn_reload):
             b.pack(side="left", padx=(0, 6))
         self.debug_var = tk.BooleanVar(value=self.cfg_mgr.config.debug.enabled)
         ttk.Checkbutton(bar, text="Debug mode", variable=self.debug_var,
@@ -746,24 +749,67 @@ class ControlPanel:
                 ttk.Label(sec, text=when, style="Muted.TLabel").grid(row=i * 2, column=1, sticky="w", padx=10)
                 ttk.Label(sec, text=tip, wraplength=760).grid(row=i * 2 + 1, column=0, columnspan=3, sticky="w")
 
-    # ------------------------------------------------------------ screenshot
-    def _screenshot(self) -> None:
+    # ------------------------------------------------------------ screenshot / read screen
+    def _countdown(self, btn: ttk.Button, what: str, worker: Callable[[], None]) -> None:
+        """Disable btn, count down capture.screenshot_delay_s seconds, then run worker in a thread."""
         delay = self.cfg_mgr.config.capture.screenshot_delay_s
-        self.btn_shot.configure(state="disabled")
-        self.log.action(f"Screenshot in {delay} s: click into Roblox now")
-        self._shot_countdown(delay)
+        icon = btn.cget("text").split()[0]
+        btn.configure(state="disabled")
+        self.log.action(f"{what} in {delay} s: click into Roblox now")
 
-    def _shot_countdown(self, left: int) -> None:
-        if left > 0:
-            self.btn_shot.configure(text=f"📸 {left}…")
-            self.root.after(1000, self._shot_countdown, left - 1)
-            return
-        self.btn_shot.configure(text="📸 …")
-        threading.Thread(target=self._shot_worker, daemon=True).start()
+        def tick(left: int) -> None:
+            if left > 0:
+                btn.configure(text=f"{icon} {left}…")
+                self.root.after(1000, tick, left - 1)
+            else:
+                btn.configure(text=f"{icon} …")
+                threading.Thread(target=worker, daemon=True).start()
+        tick(delay)
+
+    def _screenshot(self) -> None:
+        self._countdown(self.btn_shot, "Screenshot", self._shot_worker)
+
+    def _read_screen(self) -> None:
+        self._countdown(self.btn_read, "Reading the screen", self._read_worker)
+
+    def _read_worker(self) -> None:
+        cfg = self.cfg_mgr.config
+        cap = None
+        try:
+            from ..game.screens import parse_screen
+            from ..perception.capture import ScreenCapture
+            from ..perception.debug_dump import DebugDumper, draw_box
+            from ..perception.ocr import Tesseract
+            from ..perception.screen_reader import ScreenReader
+            from .screen_report import describe
+            if self.rules is None:
+                raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
+            reader = ScreenReader(Tesseract(cfg.ocr), cfg.ocr)
+            cap = ScreenCapture(cfg)
+            cap.locate(force=True)
+            frame = cap.grab_client(fresh=True)
+            raw = reader.read(frame.image)
+            catalog = load_catalog()
+            st = parse_screen(raw.kind, raw.texts, raw.shop_rows, self.rules, catalog)
+            for line in describe(st, cfg, self.rules, catalog):
+                self.log.detect(line)
+            if raw.boxes:      # save what was read, with boxes, for checking or sending in
+                marked = frame.image.copy()
+                for rect in raw.boxes.values():
+                    draw_box(marked, rect, (50, 182, 242))
+                p = DebugDumper(cfg).save(marked, f"read_{raw.kind}")
+                self.log.system(f"Picture of the boxes that were read: {p}")
+        except Exception as exc:  # show any failure in the log, never crash the GUI
+            self.log.error(f"Read screen failed: {exc}")
+        finally:
+            if cap is not None:
+                cap.close()
+        self.root.after(0, lambda: self.btn_read.configure(state="normal", text=READ_LABEL))
 
     def _shot_worker(self) -> None:
         cfg = self.cfg_mgr.config
         folder = None
+        cap = None
         try:
             from ..perception.capture import ScreenCapture
             from ..perception.debug_dump import DebugDumper, overlay_regions
@@ -784,10 +830,13 @@ class ControlPanel:
                                  "else on top, try again and click into Roblox during the countdown.")
         except Exception as exc:  # show any failure in the log, never crash the GUI
             self.log.error(f"Screenshot failed: {exc}")
+        finally:
+            if cap is not None:
+                cap.close()
         self.root.after(0, self._shot_done, folder)
 
     def _shot_done(self, folder) -> None:
-        self.btn_shot.configure(state="normal", text="📸 Screenshot")
+        self.btn_shot.configure(state="normal", text=SHOT_LABEL)
         if folder is not None:
             self._open_path(folder)
 

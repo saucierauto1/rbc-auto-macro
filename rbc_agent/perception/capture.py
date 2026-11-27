@@ -36,9 +36,16 @@ class MssBackend:
         sct = getattr(self._local, "sct", None)
         if sct is None:
             import mss
-            sct = mss.mss()
+            sct = mss.MSS()
             self._local.sct = sct
         return sct
+
+    def close(self) -> None:
+        """Free this thread's screen handles. mss never frees them by itself."""
+        sct = getattr(self._local, "sct", None)
+        if sct is not None:
+            sct.close()
+            self._local.sct = None
 
     def grab(self, rect: Rect) -> np.ndarray:
         shot = self._sct().grab({"left": rect.left, "top": rect.top,
@@ -109,6 +116,11 @@ class ScreenCapture:
         self.cache = FrameCache(cfg.capture.cache_max_age_ms / 1000.0, clock)
         self.window: WindowInfo | None = None
         self._last_window_check = -1e9
+
+    def close(self) -> None:
+        close = getattr(self.backend, "close", None)
+        if close is not None:
+            close()
 
     # -- window ---------------------------------------------------------------
     def locate(self, force: bool = False) -> WindowInfo:

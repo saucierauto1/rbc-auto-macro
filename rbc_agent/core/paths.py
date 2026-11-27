@@ -17,7 +17,7 @@ USER_CONFIG_FILE: Path = CONFIG_DIR / "config.json"
 
 DATA_DIR: Path = PROJECT_ROOT / "data"
 RULES_FILE: Path = DATA_DIR / "rbc_rules.json"
-CALIBRATION_FILE: Path = DATA_DIR / "calibration.json"
+SCREENS_FILE: Path = DATA_DIR / "rbc_screens.json"
 TEMPLATES_DIR: Path = DATA_DIR / "templates"
 
 LOGS_DIR: Path = PROJECT_ROOT / "logs"

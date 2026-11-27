@@ -50,7 +50,7 @@ rbc_agent/
 │   └── config.json               user overrides (created on first run)
 ├── data/
 │   ├── rbc_rules.json            editable game knowledge: fields, upgrades, tokens
-│   ├── calibration.json          saved UI anchor points (Stage 2/3)
+│   ├── rbc_screens.json          where text sits on each RBC screen (Stage 3)
 │   └── templates/                reference images captured on YOUR screen
 ├── logs/   debug/                runtime output
 ├── tests/                        unit + simulation tests
@@ -62,14 +62,14 @@ rbc_agent/
     │   ├── errors.py             exception hierarchy
     │   ├── paths.py              project paths
     │   ├── state_machine.py      (Stage 5) State base class, registry, transitions
-    │   └── scheduler.py          (Stage 3) per-detector scan-rate scheduler
+    │   └── scheduler.py          (Stage 5) per-detector scan-rate scheduler, built with the main loop
     ├── perception/
     │   ├── window.py             (Stage 2) find Roblox window, DPI, focus, client rect
     │   ├── capture.py            (Stage 2) mss region capture, frame cache
     │   ├── regions.py            (Stage 2) normalised ROI → pixel mapping
-    │   ├── templates.py          (Stage 3) multi-scale template matching
-    │   ├── ocr.py                (Stage 3) digit/text OCR with sanity filtering
-    │   ├── ui_detector.py        (Stage 3/8) screen classification (shop/round/loading…)
+    │   ├── ocr.py                (Stage 3) Tesseract OCR of a crop
+    │   ├── screen_reader.py      (Stage 3) find RBC panels by their green title bar, OCR their boxes
+    │   ├── templates.py          (Stage 10) template matching, for tokens and buttons
     │   ├── pollen_detector.py    (Stage 12) bar-fill measurement
     │   ├── token_detector.py     (Stage 10)
     │   ├── motion.py             (Stage 7) frame-diff / optical-flow for stuck detection
@@ -177,7 +177,8 @@ is logged, so you can always see *why* the agent chose what it did.
 | Find the Roblox window, focus, move/resize, DPI | Win32 `EnumWindows`, `GetClientRect`, `SetProcessDpiAwareness` |
 | Pollen % of capacity | Fill fraction of the pollen bar ROI (colour run-length), with no OCR needed |
 | Exact pollen / capacity numbers | OCR of the HUD text at 1–2 Hz, cross-checked against the bar % |
-| Shop / dialogue / confirm / close buttons | Template matching in calibrated ROIs |
+| RBC quest / bee / upgrade screens, round panel | Found by their green title bar; text read with Tesseract (Stage 3) |
+| Confirm / close buttons | Template matching (later stage) |
 | Round number, round timer | Digit OCR on a small ROI, with plausibility filter (round only goes +1) |
 | Loading screen / teleport | Low-variance frame + absent HUD |
 | Freeze detection | Identical frames for N seconds while input is active |
@@ -238,8 +239,8 @@ Stage 1 uses **only the standard library**, so it runs anywhere.
 |---|---|---|---|
 | 1 | Architecture + configuration | this document, typed config, logger, timing, errors | **done** |
 | 2 | Window + screenshot | window finder, DPI, ROI capture, frame cache, debug dumps | **done** |
-| 3 | Basic perception | template matcher, OCR wrapper, scheduler, calibration tool | next |
-| 4 | Game-state models | GameState, HiveProfile, RoundState, Token, Buff, Upgrade, Decision | |
+| 3 | Basic perception | OCR, RBC screen reader (anchor-based, no calibration needed), Read screen button. Templates moved to stage 10, scheduler to stage 5 | **done** |
+| 4 | Game-state models | GameState, HiveProfile, RoundState, Token, Buff, Upgrade, Decision | next |
 | 5 | State machine | State base class, timeouts, transitions, confidence gating | |
 | 6 | Input controller | SendInput, held-key ledger, stop_all_input | |
 | 7 | Movement | routes, checkpoints, stuck detection, re-centring | |

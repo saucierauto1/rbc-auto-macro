@@ -127,25 +127,38 @@
   },
   "objective_patterns": [
     {
+      "_about": "Matched against quest text read by OCR (lower case, lines joined). Several entries may share an id. Named groups: amount, color, place, mob. 'pollen' is spelled loosely because OCR sometimes reads it as 'potten'."
+    },
+    {
       "id": "collect_field_pollen",
-      "regex": "collect\\s+([\\d,\\.]+\\s*[kmbt]?)\\s+pollen\\s+from\\s+(?:the\\s+)?(.+?field|.+?patch|.+?forest)",
-      "_verify": "exact on-screen wording not confirmed"
+      "regex": "collect\\s+(?P<amount>[\\d,\\.]+\\s*[kmbt]?)\\b\\s+p[o0][lt1i]{2}en\\s+from\\s+(?:the\\s+)?(?P<place>[a-z ]+?(?:field|patch|forest))",
+      "_verify": "wording with a field not seen on screen yet"
     },
     {
       "id": "collect_color_pollen",
-      "regex": "collect\\s+([\\d,\\.]+\\s*[kmbt]?)\\s+(red|blue|white)\\s+pollen",
-      "_verify": "exact on-screen wording not confirmed"
+      "regex": "collect\\s+(?P<amount>[\\d,\\.]+\\s*[kmbt]?)\\b\\s+(?P<color>red|blue|white)\\s+p[o0][lt1i]{2}en",
+      "_seen": "Collect 20,000 Red Pollen."
+    },
+    {
+      "id": "collect_pollen",
+      "regex": "collect\\s+(?P<amount>[\\d,\\.]+\\s*[kmbt]?)\\b\\s+p[o0][lt1i]{2}en(?!\\s+from)",
+      "_seen": "Collect 120,000 Pollen."
     },
     {
       "id": "convert_pollen",
-      "regex": "convert\\s+([\\d,\\.]+\\s*[kmbt]?)\\s+pollen",
-      "_verify": "exact on-screen wording not confirmed",
+      "regex": "make\\s+(?P<amount>[\\d,\\.]+\\s*[kmbt]?)\\b\\s+honey",
+      "_seen": "Make 60,000 Honey.",
       "_note": "wiki: avoid unless blue hive or small target"
     },
     {
+      "id": "convert_pollen",
+      "regex": "convert\\s+(?P<amount>[\\d,\\.]+\\s*[kmbt]?)\\b\\s+p[o0][lt1i]{2}en",
+      "_verify": "wording not seen on screen yet"
+    },
+    {
       "id": "defeat_mobs",
-      "regex": "defeat\\s+(\\d+)\\s+(mechsquitos?|mega mechsquitos?|cogmowers?|cogturrets?)",
-      "_verify": "exact on-screen wording not confirmed"
+      "regex": "defeat\\s+(?P<amount>\\d+)\\s+(?P<mob>mega mechsquitos?|mechsquitos?|cogmowers?|cogturrets?)",
+      "_verify": "wording not seen on screen yet"
     }
   ],
   "mobs": {

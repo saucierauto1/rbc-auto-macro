@@ -16,10 +16,10 @@
       "h": 0.035
     },
     "pollen_text": {
-      "x": 0.4,
-      "y": 0.005,
-      "w": 0.2,
-      "h": 0.035
+      "x": 0.53,
+      "y": 0.025,
+      "w": 0.12,
+      "h": 0.026
     },
     "buff_bar": {
       "x": 0.0,
@@ -426,6 +426,7 @@
   "quests": {
     "priority": [
       "collect_color_pollen",
+      "collect_pollen",
       "collect_field_pollen",
       "defeat_mobs",
       "convert_pollen"
@@ -502,6 +503,19 @@
     "cache_max_age_ms": 50,
     "screenshot_delay_s": 3,
     "save_region_crops": true
+  },
+  "ocr": {
+    "tesseract_path": "",
+    "upscale": 3,
+    "timeout_s": 5.0,
+    "yellow_min_rg": 190,
+    "yellow_max_b": 140,
+    "anchor_rgb": [
+      74,
+      213,
+      84
+    ],
+    "anchor_tolerance": 18
   },
   "timeouts_s": {
     "STARTING_ROBO_BEAR": 20.0,

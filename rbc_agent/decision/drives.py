@@ -14,7 +14,7 @@ from ..core.config import DRIVE_TYPES, DriveConfig
 from ..game.hive import HiveProfile
 
 FIXED_ROUNDS = frozenset({5, 10, 15, 20, 25})
-POLLEN_QUESTS = frozenset({"collect_field_pollen", "collect_color_pollen", "convert_pollen"})
+POLLEN_QUESTS = frozenset({"collect_field_pollen", "collect_color_pollen", "collect_pollen", "convert_pollen"})
 HIVE_COLOR_TO_DRIVE = {"red": "red", "blue": "blue", "white": "white", "mixed": "glitched"}
 
 

@@ -4,10 +4,10 @@ A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
 the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
 full design, the state table and the capability matrix.
 
-**Current stage: 2 of 16 (window + screen capture) + settings GUI and decision logic.**
+**Current stage: 3 of 16 (reading the RBC screens with OCR) + settings GUI and decision logic.**
 
-> **Why START doesn't run anything yet:** this build has no screen capture, OCR,
-> keyboard/mouse input or state machine (stages 2-8). START opens a pre-flight
+> **Why START doesn't run anything yet:** this build can see and read the game, but has no
+> keyboard/mouse input or state machine yet (stages 5-8). START opens a pre-flight
 > check that lists exactly what is ready and what is still missing. Everything you
 > set in the tabs is saved to `config/config.json` and will be used once those stages land.
 
@@ -21,7 +21,21 @@ full design, the state table and the capability matrix.
   `debug.max_screenshots`.
 * **📸 Screenshot** on the Dashboard: counts down (Controls tab), then saves the game screen,
   a copy with every region outlined, and one image per region into `debug/`. Use it to
-  send the screenshots needed for Stage 3.
+  send screenshots when something is read wrong.
+
+## Stage 3: reading the RBC screens
+* **🔍 Read screen** on the Dashboard: counts down, then reads whichever RBC screen is open
+  and writes to the log what it saw and what the bot would choose (quest, upgrades to buy,
+  bee to pick). It also saves a picture with a box around every bit of text it read.
+* Reads: round, Cogs, both quest cards (objectives + Cog reward), free rerolls, upgrade names,
+  prices and effects, reroll cost, offered bees (level, mutation), and during a round the
+  time left and quest.
+* `perception/screen_reader.py` finds the RBC window and the round panel by their green title
+  bars, so it works at any window size. Box positions are in `data/rbc_screens.json`.
+* `perception/ocr.py` runs Tesseract. `game/screens.py` turns the text into values, using the
+  quest wording in `data/rbc_rules.json` (`objective_patterns`).
+* Tesseract comes inside `RBCAgent.zip` (the `tesseract` folder). Running from source? Install it
+  from https://github.com/UB-Mannheim/tesseract/wiki (or set `ocr.tesseract_path`).
 
 ## Control panel tabs
 | Tab | What you set |
@@ -42,7 +56,7 @@ Decision logic for these lives in `rbc_agent/decision/` (`drives.py`, `picks.py`
 
 ## Requirements
 * Python 3.10+ (Windows for the live agent from Stage 2; Stage 1 runs anywhere)
-* `pip install -r requirements.txt` (Stage 1 only needs `pytest`)
+* `pip install -r requirements.txt`, plus Tesseract OCR for reading the screen (see Stage 3)
 
 ## Make the .exe (Windows)
 Double-click **`build_exe.bat`**. It installs PyInstaller, builds the program and opens
@@ -57,7 +71,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (74 tests)
+python -m pytest -q                    # run the test suite (93 tests)
 ```
 
 ## Configuring
@@ -89,6 +103,7 @@ for example `poln: unknown setting (did you mean 'pollen'?)`.
 
 ## Known limitations (Stage 1)
 * There is no game interaction yet: no capture, input or state machine.
-* The default `regions` are guesses for a 16:9 HUD. The Stage 3 calibration tool replaces them.
+* The default `regions` (used by the Screenshot overlay) are guesses for a 16:9 HUD. The RBC
+  screens don't need them: they are found by their green title bars.
 * Type errors are reported first. Range checks run once types are valid, so a badly broken file can take two passes to fix.
 * Upgrade data comes from the BSS wiki (68 upgrades). Prices, reroll costs and exact quest wording are not published; prices are read on screen, quest regexes need checking in-game.

@@ -27,8 +27,15 @@ architecture notes, implementation, how to run, how to test, and known limitatio
   `data/hotbar_items.json`), Combat tab + `decision/combat.py` (wiki dodge tactics,
   Golden Cogmower hunt). Mob/drive/challenge facts from the wiki are in
   `data/rbc_rules.json` (speed bonus is 3:45, not 2:00; drives cost Cogs + honey).
-- **Next: Stage 3:** template matching, OCR, scheduler, calibration tool. Waiting on the
-  user's 📸 screenshots (quest choice, bee pick, upgrade shop, mid-round HUD).
+- **Stage 3 done (0.4.0):** `perception/ocr.py` (Tesseract via stdin, no pytesseract),
+  `perception/screen_reader.py` (finds the dialog / round panel by the green title bar
+  RGB 74,213,84, boxes in `data/rbc_screens.json` scale with it), `game/screens.py` (text ->
+  ScreenState), `ui/screen_report.py` + Dashboard 🔍 Read screen. Real screenshots in
+  `tests/fixtures/screens/` (other players' names blacked out). CI installs Tesseract and the
+  release zip bundles it (`tools/bundle_tesseract.sh`). Template matching moved to Stage 10,
+  scheduler to Stage 5 (nothing to schedule yet). Only seen at 1920x1080: other window sizes are
+  tested by shrinking the screenshots, not on a real smaller window.
+- **Next: Stage 4** (game-state models), then the Stage 5 state machine.
 
 ## Game facts (see data/rbc_rules.json)
 25 rounds, 300 s each, bonus Cogs under 3:45 (225 s). Each round: quest choice (1 of 2,

@@ -93,11 +93,12 @@ class WindowConfig:
 
 
 def _default_regions() -> dict[str, Region]:
-    # PLACEHOLDERS. These are rough guesses for a default 16:9 Roblox HUD
-    # and MUST be confirmed with the calibration tool (Stage 3).
+    # Rough guesses for a 16:9 Roblox HUD, used by the Screenshot button's overlay.
+    # The RBC panels are found by their green title bars instead (data/rbc_screens.json).
+    # pollen_text was measured on a real 1920x1080 screenshot.
     return {
         "pollen_bar": Region(0.36, 0.005, 0.28, 0.035),
-        "pollen_text": Region(0.40, 0.005, 0.20, 0.035),
+        "pollen_text": Region(0.53, 0.025, 0.12, 0.026),
         "buff_bar": Region(0.0, 0.045, 0.60, 0.06),
         "round_banner": Region(0.30, 0.10, 0.40, 0.08),
         "round_timer": Region(0.42, 0.18, 0.16, 0.05),
@@ -459,7 +460,8 @@ class BeePickConfig:
         return p
 
 
-QUEST_TYPES = ("collect_field_pollen", "collect_color_pollen", "convert_pollen", "defeat_mobs")
+QUEST_TYPES = ("collect_field_pollen", "collect_color_pollen", "collect_pollen", "convert_pollen",
+               "defeat_mobs")
 
 
 @dataclass(frozen=True)
@@ -468,7 +470,7 @@ class QuestConfig:
 
     # Best first. Ids match objective_patterns in data/rbc_rules.json.
     priority: list[str] = field(default_factory=lambda: [
-        "collect_color_pollen", "collect_field_pollen", "defeat_mobs", "convert_pollen"])
+        "collect_color_pollen", "collect_pollen", "collect_field_pollen", "defeat_mobs", "convert_pollen"])
     # Prefer the harder card (more Cogs) when both are the same type.
     prefer_harder_for_cogs: bool = True
     # Spend the one free reroll per run when both cards are of these types.
@@ -676,6 +678,34 @@ class CaptureConfig:
         return p
 
 
+@dataclass(frozen=True)
+class OcrConfig:
+    # Full path to tesseract.exe. Empty = find it automatically (see perception/ocr.py).
+    tesseract_path: str = ""
+    # Crops are enlarged this many times before reading; small game text needs it.
+    upscale: int = 3
+    timeout_s: float = 5.0
+    # Yellow reward text ("Reward: 13 Cogs"): pixels with red and green at least
+    # this bright and blue at most yellow_max_b count as text.
+    yellow_min_rg: int = 190
+    yellow_max_b: int = 140
+    # Colour of the green title bars that locate the RBC dialog and round panel (RGB).
+    anchor_rgb: list[int] = field(default_factory=lambda: [74, 213, 84])
+    anchor_tolerance: int = 18
+
+    def validate(self) -> list[str]:
+        p = []
+        if not 1 <= self.upscale <= 6:
+            p.append("upscale must be 1..6")
+        if not 0.5 <= self.timeout_s <= 30:
+            p.append("timeout_s must be 0.5..30")
+        if len(self.anchor_rgb) != 3 or not all(0 <= c <= 255 for c in self.anchor_rgb):
+            p.append("anchor_rgb must be three numbers 0..255")
+        if not 0 <= self.anchor_tolerance <= 100:
+            p.append("anchor_tolerance must be 0..100")
+        return p
+
+
 def _default_timeouts() -> dict[str, float]:
     t = {s.value: 30.0 for s in AgentState if s not in UNTIMED_STATES}
     t.update({
@@ -810,6 +840,7 @@ class AppConfig:
     hotbar: HotbarConfig = field(default_factory=HotbarConfig)
     combat: CombatConfig = field(default_factory=CombatConfig)
     capture: CaptureConfig = field(default_factory=CaptureConfig)
+    ocr: OcrConfig = field(default_factory=OcrConfig)
     timeouts_s: dict[str, float] = field(default_factory=_default_timeouts)
     recovery: RecoveryConfig = field(default_factory=RecoveryConfig)
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
