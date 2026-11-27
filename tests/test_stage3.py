@@ -80,7 +80,7 @@ def test_shop_rows_with_mangled_level_text():
 
 def test_bee_list_variable_length():
     text = ("OS\n* Vector Bee (Lvl 22)\nBeequip: None, Mutation: +4\nMovespeed !\n"
-            "* Ninja Bee (Lvl 21)\nBeequip: None, Mutation: None\n—$_$__ a\n")
+            "X Ninja Bee (Lvl 21)\nBeequip: None, Mutation: None\n—$_$__ a\n")
     bees = parse_bee_list(text, CAT)
     assert [(b.name, b.level, b.mutation, b.known) for b in bees] == [
         ("Vector", 22, "+4 Movespeed", True), ("Ninja", 21, "", True)]

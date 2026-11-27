@@ -142,7 +142,8 @@ def parse_bee_list(text: str, catalog: dict[str, BeeInfo]) -> list[BeeOffer]:
         rest = " ".join(lines[i + 1: starts[k + 1][0] if k + 1 < len(starts) else len(lines)])
         mut = re.search(r"mutation\s*[:;]?\s*([+\-]?\d+%?\s*[a-z][a-z ]*|[a-z][a-z ]*)", rest, re.IGNORECASE)
         mutation = mut.group(1).strip() if mut else ""
-        raw = m.group(1).strip()
+        # The gifted star is read as a stray letter ("X Ninja Bee"); no bee name is one letter.
+        raw = re.sub(r"^(?:\S\s+)+", "", m.group(1).strip())
         info = catalog.get(normalize_bee(raw))
         out.append(BeeOffer(info.name if info else raw.title(), info is not None,
                             int(m.group(2)), "" if mutation.lower() == "none" else mutation))
