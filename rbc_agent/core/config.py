@@ -607,14 +607,16 @@ class HotbarConfig:
     mobs_nearby_count: int = 2
     # use_when=backpack_full: fraction of capacity.
     backpack_full_at: float = 0.95
+    # use_when=round_start: the round counts as just started for this long after it is first seen.
+    round_start_window_s: float = 10.0
 
     def validate(self) -> list[str]:
         p = []
         slots = [s.slot for s in self.slots]
         if len(slots) != len(set(slots)):
             p.append("the same hotbar slot is listed twice")
-        if self.min_gap_s < 0 or self.mobs_nearby_count < 1:
-            p.append("min_gap_s must be >= 0 and mobs_nearby_count >= 1")
+        if self.min_gap_s < 0 or self.mobs_nearby_count < 1 or self.round_start_window_s < 0:
+            p.append("min_gap_s and round_start_window_s must be >= 0, mobs_nearby_count >= 1")
         if not 0.3 <= self.backpack_full_at <= 1.0:
             p.append("backpack_full_at must be in [0.3, 1.0]")
         return p

@@ -43,8 +43,23 @@ class GameState:
 
 
 def _key(st: ScreenState) -> tuple:
-    """What must match between reads. Parsed values, never raw text; time changes every read."""
-    return (st.kind, st.round_no, st.cogs if st.kind in DIALOGS else None)
+    """What must match between reads. Parsed values, never raw text; time changes every read.
+
+    The offers are part of it: two bee screens in one round have the same round and
+    Cogs, so without them one garbled read would replace the confirmed bees.
+    """
+    if st.kind == "quest_choice":
+        offers = tuple((tuple((o.type, o.amount, o.color, o.place, o.mob) for o in q.objectives), q.reward)
+                       for q in st.quests)
+    elif st.kind == "bee_pick":
+        offers = tuple((b.name, b.level, b.mutation) for b in st.bees)
+    elif st.kind == "upgrade_shop":
+        offers = tuple((o.upgrade_id or o.name, o.price) for o in st.shop)
+    elif st.kind == "in_round":
+        offers = tuple((o.type, o.amount, o.color, o.place, o.mob) for o in st.objectives)
+    else:
+        offers = ()
+    return (st.kind, st.round_no, st.cogs if st.kind in DIALOGS else None, offers)
 
 
 class RunState:

@@ -49,7 +49,16 @@ architecture notes, implementation, how to run, how to test, and known limitatio
 - **`game/perceive.py` `Perceiver`:** the one capture -> ScreenReader -> parse_screen chain (Read
   screen, Watch, and Stage 5 use it). Create and close it in the thread that uses it (`with`).
   `RBCRules.mobs` is the typed access to mob facts; nothing outside rules.py reads `.raw`.
-- **Next: Stage 5** (state machine).
+- **Stage 5 done (0.6.0):** `decision/engine.py` `decide(GameState, DecisionContext)` -> `Decision`
+  list with index targets (quest card, bee row, shop row; buys mapped to rows once each), `wait`
+  when a card/bee/price is incomplete. `core/state_machine.py` StateMachine (state, entered_at,
+  `timeout_for`). `rbc_agent/agent.py` Agent.step(): RunState -> SCREEN_STATE -> decide once per
+  (screen, round, Cogs, offers); hotbar via `slots_to_use` (round_start window from
+  `hotbar.round_start_window_s`, else phase "unknown" until Stage 7); timeouts only when
+  `actor.live`; DryRunActor logs "Would …". Watch runs the Agent. RunState's confirmation key now
+  includes parsed offers, so a changed set of cards needs `confirm_frames` reads. Drives are not
+  in the engine (no drive shop seen on screen yet).
+- **Next: Stage 6** (input: an actor with `live = True` that turns Decisions into clicks/keys).
 
 ## Game facts (see data/rbc_rules.json)
 25 rounds, 300 s each, bonus Cogs under 3:45 (225 s). Each round: quest choice (1 of 2,

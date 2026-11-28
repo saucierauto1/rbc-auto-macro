@@ -814,33 +814,30 @@ class ControlPanel:
         for b in (self.btn_read, self.btn_shot):
             b.configure(state="disabled")
         self.btn_watch.configure(text="👁 Stop watching")
-        self.log.action("Watching the screen: play normally, the agent follows the run (it presses nothing)")
+        self.log.action("Watching: play normally. The log shows what the bot would do on each screen (it presses nothing)")
         threading.Thread(target=self._watch_loop, args=(self._watch_token,), daemon=True).start()
 
     def _watch_loop(self, token: CancelToken) -> None:
         cfg = self.cfg_mgr.config
         try:
+            from ..agent import Agent, DryRunActor
             from ..core.errors import AutomationCancelled
-            from ..core.timing import interruptible_sleep
             from ..game.perceive import Perceiver
-            from ..game.state import RunState
             if self.rules is None:
                 raise RuntimeError("data/rbc_rules.json didn't load (see the log above)")
+
+            def show(gs, state) -> None:
+                t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
+                self.status.publish(
+                    rbc_round=gs.round_no, detection_confidence=gs.confidence,
+                    objective="; ".join(o.text for o in gs.objectives),
+                    action=f"{state.value} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
+
             with Perceiver(cfg, self.rules) as eyes:   # created and closed in this thread
-                run = RunState(cfg.detection)
+                agent = Agent(cfg, self.rules, eyes.catalog, eyes, DryRunActor(self.log), self.log)
                 self.status.publish(status="WATCHING")
                 try:
-                    while True:
-                        token.check()
-                        for event in run.observe(eyes.read_state()):
-                            self.log.state(event)
-                        gs = run.snapshot()
-                        t = "" if gs.time_left_s is None else f" · {gs.time_left_s // 60}:{gs.time_left_s % 60:02d} left"
-                        self.status.publish(
-                            rbc_round=gs.round_no, detection_confidence=gs.confidence,
-                            objective="; ".join(o.text for o in gs.objectives),
-                            action=f"{gs.screen.replace('_', ' ')} · {'?' if gs.cogs is None else gs.cogs} Cogs{t}")
-                        interruptible_sleep(1.0 / cfg.scan_rates.ocr_hz, token=token)
+                    agent.run_until_stopped(token, show)
                 except AutomationCancelled:
                     pass
         except Exception as exc:  # show any failure in the log, never crash the GUI
