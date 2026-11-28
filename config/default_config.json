@@ -480,7 +480,8 @@
     "slots": [],
     "min_gap_s": 0.4,
     "mobs_nearby_count": 2,
-    "backpack_full_at": 0.95
+    "backpack_full_at": 0.95,
+    "round_start_window_s": 10.0
   },
   "combat": {
     "dodge_enabled": true,

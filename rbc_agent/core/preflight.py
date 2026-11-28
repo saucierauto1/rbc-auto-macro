@@ -11,7 +11,7 @@ from .config import AppConfig
 ENGINE_PARTS: dict[str, bool] = {
     "Screen capture (Stage 2)": True,
     "Screen reading with OCR (Stage 3)": True,
-    "State machine (Stage 5)": False,
+    "State machine (Stage 5)": True,
     "Keyboard/mouse input (Stage 6)": False,
     "Movement + field routes (Stage 7)": False,
     "RBC screen detection (Stage 8)": False,

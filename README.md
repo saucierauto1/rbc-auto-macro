@@ -4,10 +4,10 @@ A state-aware Robo Bear Challenge agent for Bee Swarm Simulator that uses only
 the screen and normal keyboard/mouse input. See **ARCHITECTURE.md** for the
 full design, the state table and the capability matrix.
 
-**Current stage: 4 of 16 (tracking the run) + settings GUI and decision logic.**
+**Current stage: 5 of 16 (the bot decides what to do) + settings GUI and decision logic.**
 
-> **Why START doesn't run anything yet:** this build can see and read the game, but has no
-> keyboard/mouse input or state machine yet (stages 5-8). START opens a pre-flight
+> **Why START doesn't run anything yet:** this build can read the game and decide what to do,
+> but can't press keys or click yet (stages 6-8). Use **👁 Watch** to see its decisions live. START opens a pre-flight
 > check that lists exactly what is ready and what is still missing. Everything you
 > set in the tabs is saved to `config/config.json` and will be used once those stages land.
 
@@ -49,6 +49,19 @@ full design, the state table and the capability matrix.
 * Upgrades tab: **Never buy the other colour** (on by default): no blue upgrades for a red
   hive, or the reverse, unless they are on your priority list.
 
+## Stage 5: deciding what to do
+* **👁 Watch** now also logs what the bot **would** do on each screen while you play:
+  "Would choose Quest A", "Would pick Precise Bee", "Would buy Credit (7 Cogs)",
+  "Would start the round", "Would press hotbar slot 2 (Glitter)". It still presses nothing.
+* `decision/engine.py` `decide(GameState)`: one decision list per screen (quest card, bee row,
+  shop rows to buy/LOCK, then start). If a card or price wasn't read completely it says
+  "Waiting: …" instead of guessing.
+* `core/state_machine.py` tracks the current state and its timeout (`timeouts_s`);
+  `rbc_agent/agent.py` runs read → track → state → decide → act, deciding once per screen
+  content so nothing is clicked twice. Timeouts only count once the bot presses keys (Stage 6).
+* Hotbar: `round_start` slots fire in the first `hotbar.round_start_window_s` seconds of a
+  round. "While farming" / "at hive" slots wait for Stage 7 (the bot doesn't know where it is yet).
+
 ## Control panel tabs
 | Tab | What you set |
 |---|---|
@@ -83,7 +96,7 @@ python main.py                         # open the control panel window
 python main.py --check-config          # validate your config, print a summary
 python main.py --print-config          # see the fully merged config
 python main.py --write-default-config  # regenerate config/default_config.json
-python -m pytest -q                    # run the test suite (105 tests)
+python -m pytest -q                    # run the test suite (115 tests)
 ```
 
 ## Configuring
